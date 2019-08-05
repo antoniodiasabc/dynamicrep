@@ -1,0 +1,172 @@
+<div class="menu">
+<table id="table_menu"><tr>
+
+	<td class="permanent_td" align="left">
+		Tipo de Relatorio
+		<br>
+		<select id="report_type">			
+			<option value="top10">Top 10</option>
+			<option value="resumo">Resumo mensal</option>
+			<option value="comparativo">Comparativo</option>
+			<option value="prioridade">Comparativo com prioridades</option>
+		</select>
+	</td>
+	<td class="permanent_td" align="left">
+		Intervalo
+		<br>
+		<select id="interval">
+			<option value="minuto">minuto</option>
+			<option value="hora">hora</option>
+			<option value="dia">dia</option>
+			<option value="mes">mês</option>
+		</select>
+	</td>
+	<td class="permanent_td" align="left">
+		Selecione o momento inicial do gráfico:
+		<br>
+		<input type="text" id="input_datetime" readonly>
+	</td>
+	
+</tr></table>
+</div>
+
+<script type="text/javascript" src="../api/jquery-ui-1.12.0/jquery-ui.js"></script>
+<script type="text/javascript" src="../api/jquery-ui-1.12.0/i18n/datepicker-pt-BR.js"></script>
+<script type="text/javascript" src="../api/jQuery-Timepicker-Addon-master/dist/jquery-ui-timepicker-addon.js"></script>
+<script type="text/javascript" src="../api/jQuery-Timepicker-Addon-master/dist/i18n/jquery-ui-timepicker-pt-BR.js"></script>
+	
+<script> 
+
+$(function() {
+		
+	function add_messagetype_option(td,type){
+		switch(type){
+			case "top10":
+				td.after('<td align="left">\
+						Tipo de mensagem\
+						<br>\
+						<select id="messagetype"">\
+							<option value="recebidas">Recebidas</option>\
+							<option value="transmitidas">Transmitidas</option>\
+						</select>\
+					</td>\
+				');
+				break;
+			case "resumo":
+				td.after('<td align="left">\
+						Tipo de mensagem\
+						<br>\
+						<select id="messagetype"">\
+							<option value="recebidas">Recebidas</option>\
+							<option value="transferidas">Transferidas</option>\
+							<option value="entregues_localmente">Entregues Localmente</option>\
+							<option value="rejeitadas">Rejeitadas</option>\
+						</select>\
+					</td>\
+				');
+				break;
+			case "prioridade":
+			case "comparativo":
+				td.after('<td align="left">\
+						Tipo de mensagem\
+						<br>\
+						<select id="messagetype"">\
+							<option value="recebidas">Recebidas</option>\
+							<option value="transmitidas">transmitidas</option>\
+							<option value="entregues_localmente">Entregues Localmente</option>\
+							<option value="rejeitadas">Rejeitadas</option>\
+						</select>\
+					</td>\
+				');
+				break;
+		}
+	}
+	
+	function add_group_option(td){
+		td.after('<td align="left">\
+				Selecione o grupo\
+				<br>\
+				<select id="group"">\
+					<option value="grupo1">grupo1</option>\
+					<option value="grupo2">grupo2</option>\
+				</select>\
+			</td>\
+		');		
+	}
+	
+	function remove_noncommom_options(){
+		
+		$( "#table_menu td").each(function(index) {
+			if($(this).attr('class') != "permanent_td"){
+				this.remove();				
+			}
+		});
+	}
+	
+	function update_graph(){
+		var datetime = $("#input_datetime").value;
+		if (datetime) {
+			var parametro = 'logtime="' + datetime + '"';			
+			loadData(parametro);			
+		}
+	}
+	
+	$("#interval").change(function (){
+        $( "#input_datetime" ).datepicker("destroy");
+        switch ( this.value) {
+                case "minuto":
+                        $( "#input_datetime" ).datetimepicker({ 
+                                timeFormat: "HH:mm:00",
+                                dateFormat: "yy-mm-dd"
+                        });
+                        break;
+                case "hora":
+                        $( "#input_datetime" ).datetimepicker({ 
+                                timeFormat: "HH:00:00",
+                                dateFormat: "yy-mm-dd"
+                        });
+                        break;
+                case "dia":
+                case "mes":
+                        $( "#input_datetime" ).datetimepicker({ 
+                        		timeFormat: "00:00:00",
+                                dateFormat: "yy-mm-dd"
+                        });
+                        break;
+                default:
+                        alert("Erro com o calendário");
+                        break;
+        }		
+	});
+
+	$("#report_type").change(function() {
+		var value = this.value;
+		var text = $("#report_type option:selected").text();
+		var refential_td = $("#table_menu tr:first td:first");
+		
+		remove_noncommom_options();		
+		add_messagetype_option($("#table_menu tr:first td:first"),value);		
+		switch (value){
+			case "top10":
+			case "resumo":
+				break;
+			case "comparativo":
+			case "prioridade":
+				add_group_option(refential_td);
+				break;
+			default:
+				alert("Tipo de grafico " + text + " nao eh reconhecido.");
+				console.log("Tipo de grafico escolhido no menu nao eh valido. Valor: " + value + "; texto: " + text + ".");
+				break;
+		}		
+	});	
+	
+	$("#report_type").change();
+ 	$( "#input_datetime" ).datetimepicker({ 
+ 		timeFormat: "HH:mm:00",
+ 		dateFormat: "yy-mm-dd "
+ 	});
+ 	//$("#input_datetime").change(update_graph());
+ 	
+});
+</script>

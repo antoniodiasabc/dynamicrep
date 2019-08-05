@@ -1,0 +1,1291 @@
+<link rel="stylesheet" href="../api/jQuery-Timepicker-Addon-master/dist/jquery-ui-timepicker-addon.css">
+<link rel="stylesheet" href="../api/jquery-ui-1.12.0/jquery-ui.css">
+<link rel="stylesheet" href="../api/chosen/chosen.css">
+<script type="text/javascript" src="../api/jquery-ui-1.12.0/jquery-ui.js"></script>
+<script type="text/javascript" src="../api/jquery-ui-1.12.0/i18n/datepicker-pt-BR.js"></script>
+<script type="text/javascript" src="../api/jQuery-Timepicker-Addon-master/dist/jquery-ui-timepicker-addon.js"></script>
+<script type="text/javascript" src="../api/jQuery-Timepicker-Addon-master/dist/i18n/jquery-ui-timepicker-pt-BR.js"></script>
+<script type="text/javascript" src="../api/chosen/chosen.jquery.js"></script>
+
+<!-- Imports para o grafico  -->
+<script type="text/javascript" src="../api/flot/jquery.flot.js"></script>
+<script type="text/javascript" src="../api/flot/jquery.flot.time.js"></script>
+<script type="text/javascript" src="../api/flot/jquery.flot.symbol.js"></script>
+<script type="text/javascript" src="../api/flot/jquery.flot.pie.js"></script>
+<script type="text/javascript" src="../api/flot/jquery.flot.pie.js"></script>
+<script type="text/javascript" src="../api/flot/flot-axislabels/jquery.flot.axislabels.js"></script>
+<script type="text/javascript" src="../api/flot/flot-valuelabels/jquery.flot.valuelabels.js"></script>
+
+<!-- Imports para o pdf -->
+<script type="text/javascript" src="../api/jsPDF-master/jspdf.js"></script>
+<script type="text/javascript" src="../api/jsPDF-master/dist/jspdf.min.js"></script>
+<script type="text/javascript" src="../api/jsPDF-master/libs/html2canvas/dist/html2canvas.js"></script>
+<script type="text/javascript" src="../api/jsPDF-master/plugins/addimage.js"></script>
+<script type="text/javascript" src="../api/jsPDF-master/plugins/png_support.js"></script>
+<script type="text/javascript" src="../api/jsPDF-master/libs/png_support/png.js"></script>
+<script type="text/javascript" src="../api/jsPDF-master/libs/png_support/zlib.js"></script>
+<script type="text/javascript" src="../api/FileSaver.js-master/FileSaver.min.js"></script>
+
+<style>
+.botao-travado {
+	display: block;
+	width: 115px;
+	height: 20px;
+	background: gray-light;
+	padding: 0px;
+	text-align: center;
+	border-radius: 5px;
+	color: gray;
+	font-weight: bold;
+}
+
+.botao-livre {
+	display: block;
+	width: 115px;
+	height: 20px;
+	background: #4E9CAF;
+	padding: 0px;
+	text-align: center;
+	border-radius: 5px;
+	color: white;
+	font-weight: bold;
+}
+</style>
+
+<div id="functionalities_menu" class="menu">
+	<div id="parameters">
+		<table id="table_menu">
+			<tr class="permanent_tr">
+
+				<td class="permanent_td" align="left">Tipo de Relatório <br>
+					<select id="report_type">
+					<option value="resumo">Resumo</option>
+						<option value="top">Top</option>
+						<!-- <option value="resumoAssinantes">Resumo dos assinantes</option>  -->
+						<option value="grupo">Comparativo por grupo</option>
+						<option value="prioridade">Comparativo por prioridades</option>
+				</select>
+				</td>
+				<td class="permanent_td" align="left">Intervalo <br> <select
+					id="interval">
+						<option value="ano">ano</option>
+						<option value="hora">hora</option>
+						<option value="dia">dia</option>
+						<option value="mes">mes</option>
+				</select>
+				</td>
+				<td class="permanent_td" align="left">Momento inicial do gráfico: <br>
+					<input type="text"	id="input_datetime_inicial" readonly>
+				</td>
+				<td class="permanent_td" align="left">Momento final do gráfico: <br>
+					<input type="text"	id="input_datetime_final" readonly >
+				</td>
+
+			</tr>
+		</table>
+	</div>
+	<div id="group_menu"></div>
+	<div id="actions_buttons">
+		<table>
+			<tr>
+				<td><button id="btn_generate_graph" class="botao-travado"
+						disabled>Gerar gráfico</button></td>
+				<td><img id="loading" src="../estatistica/imgs/loading.gif"
+					alt="carregando" hidden></img></td>
+				<td><button id="btn_generate_pdf" type="button"
+						class="botao-travado" disabled style="display: none;">Baixar .pdf</button></td>
+			</tr>
+		</table>
+	</div>
+</div>
+
+<div id="graph">
+	<div id="content_flot">
+		<div style="align: center; width: auto; height: 400px; margin: 15px;">
+			<table style="width:100%"><tr>
+			<td align="right" id="flot-titulo" style="align: center;"></td>
+			   <td align="right" id="flot-legenda" style="align: right;"></td>			   
+			</tr></table>
+			
+			<div id="flot-placeholder" style="width: 100%; height: 100%;"></div>
+			
+		</div>
+	</div>
+</div>
+<script>
+	$(function() {
+
+		$.ajaxSetup({
+			contentType : "application/json; charset=utf-8"
+		});
+
+		/* Funçoes/açoes do Menu */
+		var uas_list = [];
+		var address_get_uas_list = "/listaCaas";
+		var uas_selected = [];
+
+		$("#btn_generate_graph").click( function() {
+			var datetime_inicial = $("#input_datetime_inicial").val();
+			var datetime_final = $("#input_datetime_final").val();
+			var tipoIntervalo =  $("#interval").val();
+			
+			if(datetime_inicial == "" || datetime_final == ""){
+				alert("É necessário preencher ambas data inicial e final para gerar o gráfico");
+				return false;
+			}
+			if(!validaData(datetime_inicial,datetime_final,tipoIntervalo)) {
+				mensagemErro = "Intervalo de datas inválido: ";
+				if (datetime_inicial > datetime_final) {
+					mensagemErro += "data inicial superior à final.";
+				} else if (datetime_inicial == datetime_final){
+					mensagemErro += "data inicial igual à final.";
+				} else {
+					mensagemErro += "período supera o limite de ";
+					switch(tipoIntervalo){
+						case "minuto":
+							mensagemErro += "60 minutos.";
+							break;
+						case "hora":
+							mensagemErro += "24 horas.";
+							break;
+						case "dia":
+							mensagemErro += "1 mês.";
+							break;
+						case "mes":
+							mensagemErro += "12 meses.";
+							break;
+						default:
+							mensagemErro += "[intervalo selecionado inválido]";	
+							break;
+					}
+				}
+				alert(mensagemErro);
+				return false;
+			}			
+			var params = [];
+			params["report_type"] = $("#report_type").val(); // Tipo de relatório
+			params["message_type"] = $("#message_type").val(); // Tipo de mensagem
+			params["interval"] = $("#interval").val(); // Valor do intervalo
+			params["datetime_inicial"] = datetime_inicial; // Período
+			params["datetime_final"] = datetime_final; // Período
+			params["quantidade_top"] = $("#quantidade_top").val();
+
+			if ($("#group_menu").text() != "") {
+
+				var group = [];
+				var grupoVazio = false;
+				var erroComGrupos = false;
+				$.each($("#group_menu").find("ul.chosen-choices"), function() {
+					var uas = [];
+					var empty = true;
+					$.each($(this).find('li.search-choice'), function() {
+						uas.push($(this).find('span').text());
+						empty = false;
+					});
+					if (!empty) {
+						group.push(uas);
+						if(grupoVazio) {
+							alert("Grupos intermediários não podem ficar vazios");
+							erroComGrupos = true;
+							return false;
+						}
+					} else {
+						grupoVazio = true;							
+					}						
+				});
+				if(erroComGrupos) {
+					return false;
+				}
+				if (group.length == 1
+						&& params["report_type"] != "grupo") { //Se só houver um grupo, transforma a lista de grupos em um 'unico grupo
+					var aux = group.pop();
+					group = aux;
+				}
+				if (group.length == 0
+						&& params["report_type"] == "grupo") {
+					alert("Para gerar o gráfico é necessário informar assinantes");
+					return;
+				}
+				if (group.length == 1
+						&& params["report_type"] == "grupo"){
+					alert("Para gerar o gráfico comparativo por grupo é necessário informar assinantes em mais de um grupo");
+					return;
+				}					
+				
+				params['group'] = group;
+			}
+			generate_graph(params);
+			$("#btn_generate_pdf").removeAttr("disabled");
+			$("#btn_generate_pdf").attr("class", "botao-livre");
+		});
+
+		$("#btn_generate_pdf").click( function download_pdf() {
+			html2canvas($("#flot-placeholder").get(0), {
+				onrendered : function(canvas) {
+					var imgData = canvas.toDataURL('image/png');
+					var imgWidth = 270;
+					var imgHeight = (imgWidth * canvas.height) / canvas.width;
+					var report_type = $("#report_type").val();
+					var message_type = $("#message_type").val();
+					var date = $("#input_datetime_inicial").val();
+					var interval = $("#interval").val();
+					var titulo = "Grafico de " + date
+							+ " por " + interval
+							+ " do tipo " + report_type
+							+ " - " + message_type;
+					var doc = new jsPDF('landscape');
+					var centro_pagina = (doc.internal.pageSize.width / 2);
+					var margem_y = 5;
+					var y = margem_y;
+
+					doc.text(titulo, centro_pagina, y,
+							'center');
+					y += margem_y * 2;
+					doc.addImage(imgData, 'png', 12, y,
+							imgWidth, imgHeight);
+
+					setTimeout(function() { // Sem um tempo de atraso o download
+						// simplesmente não funciona no Firefox
+						doc.save(date + "-" + interval
+								+ "-" + report_type
+								+ "-" + message_type
+								+ ".pdf");
+					}, 1000);
+				}
+			});
+		});
+
+		function gera_csv(graph_data) {
+			// Gera conteudo do .csv
+			var csv_content = "";
+			var keys = Object.keys(graph_data[0]);
+
+			if (keys.length == 0) {
+				console
+						.log("O valor do json para gerar o arquivo .csv esta vazio [tem índice de chaves vazio]");
+				alert("Erro: JSON de dados vazio");
+				return;
+			}
+			// Cria linha de cabeçalho do .csv com o nome dos campos
+			for (var i = 0; i < keys.length - 1; i++) {
+				if (keys[i] != "id") {
+					csv_content += "\"" + keys[i] + "\",";
+				}
+			}
+			csv_content += "\"" + keys[keys.length - 1] + "\"\n"; // keys.length >= 1
+			// por conta da
+			// verificaçao
+			// inicial
+
+			$.each(graph_data, function() {
+				for (var i = 0; i < keys.length - 1; i++) {
+					if (keys[i] != "id") {
+						csv_content += "\"" + this[keys[i]] + "\",";
+					}
+				}
+				csv_content += "\"" + this[keys[keys.length - 1]] + "\"\n";
+			});
+
+			// Organiza .csv em arquivo para download
+			var report_type = $("#report_type").val();
+			var message_type = $("#message_type").val();
+			var date = $("#input_datetime_inicial").val() + "--" + $("#input_datetime_final").val();
+			var interval = $("#interval").val();
+			$("#acsv").attr(
+					"download",
+					date + "-" + interval + "-" + report_type + "-"
+							+ message_type + ".csv");
+			$("#acsv").attr(
+					"href",
+					"data:text/csv;charset=utf-8;base64,"
+							+ window.btoa(csv_content));
+			$("#acsv").attr("class", "botao-livre")
+		}
+
+		function add_message_type_option(td, type) {
+			switch (type) {
+			case "top":
+				td
+						.after('<td align="left">\
+						Quantidade\
+						<br>\
+						<select id="quantidade_top"">\
+							<option value="5">5</option>\
+							<option value="10">10</option>\
+							<option value="15">15</option>\
+							<option value="30">30</option>\
+						</select>\
+						<td align="left">\
+						Tipo de mensagem\
+						<br>\
+						<select id="message_type"">\
+							<option value="recebidas">Recebidas</option>\
+							<option value="transferidas">Transferidas</option>\
+						</select>\
+					</td>\
+				');
+				break;
+			case "resumo":
+				td.after('<td align="left">\
+						Tipo de mensagem\
+						<br>\
+						<select id="message_type"">\
+							<option value="recebidas">Recebidas</option>\
+							<option value="transferidas">Transferidas</option>\
+							<option value="entregues_localmente">Entregues localmente</option>\
+							<option value="rejeitadas">Rejeitadas</option>\
+						</select>\
+					</td>\
+				');
+				break;
+			case "resumoAssinantes":
+				td.after('<td align="left">\
+						Tipo de mensagem\
+						<br>\
+						<select id="message_type"">\
+							<option value="recebidas">Recebidas</option>\
+							<option value="transferidas">Transferidas</option>\
+							<option value="rejeitadas">Rejeitadas</option>\
+						</select>\
+					</td>\
+				');
+				break;
+			case "grupo":
+				td
+						.after('<td align="left">\
+						Tipo de mensagem\
+						<br>\
+						<select id="message_type"">\
+							<option value="recebidas">Recebidas</option>\
+							<!-- <option value="transferidas">Transferidas</option> -->\
+							<option value="entregues_localmente">Entregues localmente</option>\
+							<option value="recebidas_entregues_localmente">Recebidas + Entregues localmente</option>\
+							<option value="rejeitadas">Rejeitadas</option>\
+						</select>\
+					</td>\
+				');
+				break;
+			case "prioridade":
+				td
+						.after('<td align="left">\
+						Tipo de mensagem\
+						<br>\
+						<select id="message_type"">\
+							<option value="recebidas">Recebidas</option>\
+							<option value="transferidas">Transferidas</option>\
+						</select>\
+					</td>\
+				');
+				break;
+			}
+		}
+
+		function add_group_option(num_groups) {
+			if (uas_list.length == 0) {
+				$.get(address_get_uas_list, function(data) {
+					uas_list = data;
+					add_data_group_option(num_groups);
+				});
+			} else {
+				add_data_group_option(num_groups);
+			}
+			uas_selected.length = 0;
+
+		}
+
+		function cria_tabela_selecao_grupos() {
+			var tabela = $("#table_group").text();
+			if (tabela == "") {
+				$("#group_menu")
+						.append(
+								'<table id="table_group">\
+					<tr id="tr_group_option" align="left">\
+					<style>td {vertical-align:top, width:25%;}</style>\
+					</tr></table>');
+			}
+		}
+
+		function adiciona_grupo(nome, id) {
+			$("#table_group")
+					.append(
+							'<td>'
+									+ nome
+									+ '<br>\
+				<select id="'+id+'" multiple class="chosen">\
+				</td>');
+			make_uas_list_li($("#" + id));
+		}
+
+		function adiciona_botao_novogrupo() {
+			$("#table_group")
+					.append(
+							'<td>\
+				<button id="btn_novogrupo" type="button">Adicionar novo grupo</button>\
+				</td>');
+			$("#btn_novogrupo").on(
+					'click',
+					function() {
+						$("#table_group").find("#btn_novogrupo").parent()
+								.remove();
+						var numero_grupo = $("#table_group td").length + 1;
+						adiciona_grupo("Grupo " + numero_grupo, "select_grupo"
+								+ numero_grupo);
+						if (parseInt(numero_grupo,10) < 8) {
+							adiciona_botao_novogrupo();
+						}
+					});
+		}
+
+		function add_data_group_option(num_groups) {
+			cria_tabela_selecao_grupos();
+			if (parseInt(num_groups,10) > 1) {
+				adiciona_grupo("Grupo 1", "select_grupo1");
+				adiciona_grupo("Grupo 2", "select_grupo2");
+				adiciona_botao_novogrupo();
+			} else {
+				adiciona_grupo("Grupo de assinantes", "select_grupo");
+			}
+
+		}
+
+		function make_uas_list_li(select) {
+			select.empty();
+			$.each(uas_list, function() {
+				//var cn = this;
+				var cn = this.split('=')[1].split("/")[0].split(",")[0];
+				select.append('<option value="' + this + '">' + cn
+						+ '</option>');
+			});
+			select.chosen({
+				search_contains : true,
+				no_results_text: "Nada encontrado para o filtro",
+				placeholder_text_multiple: "Selecione algumas opções"
+			});
+		}
+
+		function remove_noncommom_options() {
+			$("#group_menu").empty();
+			$("#table_menu tr").each(function(index) {
+				if ($(this).attr('class') != "permanent_tr") {
+					this.remove();
+				}
+			});
+			$("#table_menu td").each(function(index) {
+				if ($(this).attr('class') != "permanent_td") {
+					this.remove();
+				}
+			});
+		}
+		
+		function validaData(inicio, fim, tipoIntervalo){
+			
+			function imprimeErro(){
+				console.log("Data inválida");
+			}			
+			
+			var diferencaAno = parseInt(fim.substring(0,4)) - parseInt(inicio.substring(0,4));
+			var diferencaMes;
+			var diferencaDia;
+			var diferencaHora;
+			var diferencaMinuto;
+			
+			//calcula diferenca dos meses
+			if( diferencaAno < 0 || diferencaAno > 1) {
+				imprimeErro();
+				return false;
+			} else if(diferencaAno == 0) {
+				diferencaMes = parseInt(fim.substring(5,7)) - parseInt(inicio.substring(5,7));	
+			} else { //diferencaAno == 1
+				diferencaMes = parseInt(fim.substring(5,7)) + (12 - parseInt(inicio.substring(5,7)));
+			}
+			
+			//calcula diferenca dos dias
+			if(tipoIntervalo == "mes" && diferencaMes <= 12 && diferencaMes > 0) {
+				return true;
+			} else if (diferencaMes < 0 || diferencaMes > 1) {
+				imprimeErro();
+				return false;
+			} else if(diferencaMes == 0){
+				diferencaDia = parseInt(fim.substring(8,10)) - parseInt(inicio.substring(8,10));
+			} else { //diferencaMes == 1
+				if(parseInt(inicio.substring(8,10)) - parseInt(fim.substring(8,10)) < 0) { //Se ultrapassou o dia no mes seguinte 
+					imprimeErro();
+					return false;
+				} else { 
+					switch(inicio.substring(5,7)) { //switch no mes inicial
+						case "01":
+						case "03":
+						case "05":
+						case "07":
+						case "08":
+						case "10":
+						case "12":
+							diferencaDia = parseInt(fim.substring(8,10)) + (31 - parseInt(inicio.substring(8,10)));
+							break;
+						case "02":
+							diferencaDia = parseInt(fim.substring(8,10)) + (28 - parseInt(inicio.substring(8,10)));
+							break;
+						case "04":
+						case "06":
+						case "09":
+						case "11":					
+							diferencaDia = parseInt(fim.substring(8,10)) + (30 - parseInt(inicio.substring(8,10)));
+							break;
+					}
+				}
+			}
+			
+			//calcula diferenca das horas
+			if(tipoIntervalo == "dia") {
+				if (diferencaDia > 0) { //A verifição se ultrapassa o mesmo dia no mês seguinte já foi realizada
+					return true;
+				}
+				else {
+					imprimeErro();
+					return false;
+				}
+			} else if (diferencaDia < 0 || diferencaDia > 1) {
+				imprimeErro();
+				return false;
+			} else if(diferencaDia == 0){
+				diferencaHora = parseInt(fim.substring(11,13)) - parseInt(inicio.substring(11,13));
+			} else { //diferencaDia == 1
+				diferencaHora = parseInt(fim.substring(11,13)) + (24 - parseInt(inicio.substring(11,13)));				
+			}
+			
+			//calcula diferenca das minutos
+			if(tipoIntervalo == "hora") {
+				if (diferencaHora > 0 && diferencaHora <= 24) {
+					return true;
+				}
+				else {
+					imprimeErro();
+					return false;
+				}				
+			} else if (diferencaHora < 0 || diferencaHora > 1) {
+				imprimeErro();
+				return false;
+			} else if(diferencaHora == 0){
+				diferencaMinuto = parseInt(fim.substring(14,16)) - parseInt(inicio.substring(14,16));
+			} else { //diferencaHora == 1
+				diferencaMinuto = parseInt(fim.substring(14,16))  + (60 - parseInt(inicio.substring(14,16)));				
+			}
+			
+			if(tipoIntervalo == "minuto"){
+				if (diferencaMinuto > 0 && diferencaMinuto <= 60) {
+					return true;
+				}
+				else {
+					imprimeErro();
+					return false;
+				}
+			}
+			
+			console.log("Erro desconhecido ao calcular a diferença de datas");
+			return false;
+		
+		}
+		
+		String.prototype.replaceAt=function(index, character) {
+		    return this.substr(0, index) + character + this.substr(index+character.length);
+		}
+		
+		function atualizaFormatoDataHoraInput(formato){
+			var dtInicial = $("#input_datetime_inicial").val();
+			var dtFinal = $("#input_datetime_final").val();
+			switch (formato) {				
+				case "mes":
+					dtInicial = (dtInicial.length == 0 ? "" : dtInicial.replaceAt(8,"0"));
+					dtInicial = (dtInicial.length == 0 ? "" : dtInicial.replaceAt(9,"1"));
+					dtFinal = (dtFinal.length == 0 ? "" : dtFinal.replaceAt(8,"0"));
+					dtFinal = (dtFinal.length == 0 ? "" : dtFinal.replaceAt(9,"1"));					
+				case "dia":
+					dtInicial = (dtInicial.length == 0 ? "" : dtInicial.replaceAt(11,"0"));
+					dtInicial = (dtInicial.length == 0 ? "" : dtInicial.replaceAt(12,"0"));
+					dtFinal = (dtFinal.length == 0 ? "" : dtFinal.replaceAt(11,"0"));
+					dtFinal = (dtFinal.length == 0 ? "" : dtFinal.replaceAt(12,"0"));					
+				case "hora":
+					dtInicial = (dtInicial.length == 0 ? "" : dtInicial.replaceAt(14,"0"));
+					dtInicial = (dtInicial.length == 0 ? "" : dtInicial.replaceAt(15,"0"));
+					dtFinal = (dtFinal.length == 0 ? "" : dtFinal.replaceAt(14,"0"));
+					dtFinal = (dtFinal.length == 0 ? "" : dtFinal.replaceAt(15,"0"));
+					break;
+				default:
+					console.log("Erro: formato " + formato + " não é válido para atualização do input de data/hora");
+					alert("Erro: verifique o log do console");
+					break;
+			}
+			$("#input_datetime_inicial").val(dtInicial);
+			$("#input_datetime_final").val(dtFinal);
+			
+		}
+		
+		function atualiza_datetimepickers(){
+			var dtFinal = $("#input_datetime_final");
+			var dtInicial = $("#input_datetime_inicial");
+			
+			dtInicial.datepicker("destroy");
+			dtFinal.datepicker("destroy");
+			var formato_datetime;
+			switch ($("#interval").val()) {
+				case "minuto":
+					formato_datetime = {
+						timeFormat : "HH:mm:00",
+						dateFormat : "yy-mm-dd"
+					};
+					break;
+				case "hora":
+					formato_datetime = {
+						timeFormat : "HH:00:00",
+						dateFormat : "yy-mm-dd"
+					};
+					atualizaFormatoDataHoraInput("hora");
+					break;
+				case "dia":
+					formato_datetime = {
+						timeFormat : "00:00:00",
+						dateFormat : "yy-mm-dd",
+					};
+					atualizaFormatoDataHoraInput("dia");
+					break;
+				case "mes":
+					formato_datetime = {
+						timeFormat : "00:00:00",
+						dateFormat : "yy-mm-01",
+						changeMonth : true,
+						changeYear : true,
+						showButtonPanel : true
+						/*onChangeMonthYear: function(dateText, inst) {
+							debugger;
+							$(this).datetimepicker('setDate', new Date(
+													inst.selectedYear,
+													inst.selectedMonth,
+													1)
+							);							
+						}*/ //TODO: Algum evento está chamando essa função logo depois dela ser usada corretamente e definindo um valor padrão.
+					};
+					atualizaFormatoDataHoraInput("mes");
+					break;
+				default:
+					alert("Erro com o calendário");
+					break; 
+			} 
+			formato_datetime['maxDate'] = 0;
+						
+			dtFinal.datetimepicker(formato_datetime);			
+			dtInicial.datetimepicker(formato_datetime);
+		}
+		
+				
+		function atualiza_menu() {
+			var value = this.value;
+			var text = $("#report_type option:selected").text();
+			var refential_td = $("#table_menu tr:first td:first");
+
+			remove_noncommom_options();
+			add_message_type_option(
+					$("#table_menu tr:first td:first"), value);
+			switch (value) {
+			case "grupo":
+				add_group_option(2);
+				break;
+			case "resumo":
+			case "top":
+			case "prioridade":
+				add_group_option(1);
+				break;
+			case "resumoAssinantes":
+				break;
+			default:
+				alert("Tipo de gráfico " + text
+						+ " não é reconhecido.");
+				console.log("Tipo de gráfico escolhido no menu não é valido. Valor: "
+								+ value
+								+ "; texto: "
+								+ text
+								+ ".");
+				break;
+			}
+		}
+		
+		function libera_geracao_grafico(){
+			$("#btn_generate_graph").removeAttr('disabled');
+			$("#btn_generate_graph").attr('class', 'botao-livre');
+		}
+		
+		function nomeMes(mes){
+			switch(mes){
+				case "1":
+				case "01":
+					return "janeiro";
+				case "2":
+				case "02":
+					return "fevereiro";
+				case "3":
+				case "03":
+					return "março";
+				case "4":
+				case "04":
+					return "abril";
+				case "5":
+				case "05":
+					return "maio";
+				case "6":
+				case "06":
+					return "junho";
+				case "7":
+				case "07":
+					return "julho";
+				case "8":
+				case "08":
+					return "agosto";
+				case "9":
+				case "09":
+					return "setembro";
+				case "10":				
+					return "outubro";
+				case "11":
+					return "novembro";
+				case "12":				
+					return "dezembro";
+				default:
+					console.log("Mês com número " + mes + " é inválido e não se encontra na \"tabela\" de tradução");
+					return "mes inválido";
+			}
+		}
+		
+		function nomeGrafico(tipoIntervalo, dataInicial, dataFinal) {
+			var nomeTipo, nomeDataInicio, nomeDataFim, nomeDataComplemento;
+			
+			switch(tipoIntervalo){
+				case "dia":
+					nomeDataInicio = dataInicial.substring(8, 10);
+					nomeDataFinal = nomeMes(dataFinal.substring(8, 10));
+					if(dataInicial.substring(5, 7) == dataFinal.substring(5, 7)) { //Mês é igual (logo ano tbm)
+						nomeDataComplemento = " de " + nomeMes(dataFinal.substring(5, 7)) + " de " + dataFinal.substring(0, 4);		
+					} else {
+						nomeDataInicio += " de " + nomeMes(dataInicial.substring(5, 7));
+						nomeDataFinal += " de " + nomeMes(dataFinal.substring(5, 7));
+						if(dataInicial.substring(0, 4) == dataFinal.substring(0, 4)) { //Ano é igual
+							nomeDataComplemento += " de " + dataFinal.substring(0, 4);		
+						} else {
+							nomeDataInicio += " de " + dataInicial.substring(0, 4);
+							nomeDataFinal += " de " + dataFinal.substring(0, 4);
+							nomeDataComplemento = "";
+						}
+					}
+					break;
+				case "mes":
+					nomeDataInicio = nomeMes(dataInicial.substring(5, 7));
+					nomeDataFinal = nomeMes(dataFinal.substring(5, 7));
+					if(dataInicial.substring(0, 4) == dataFinal.substring(0, 4)) { //Ano é igual
+						nomeDataComplemento = " de " + dataFinal.substring(0, 4);		
+					} else {
+						nomeDataInicio += " de " + dataInicial.substring(0, 4);
+						nomeDataFinal += " de " + dataFinal.substring(0, 4);
+						nomeDataComplemento = "";
+					}
+					break;
+				case "hora":
+					break;
+				case "minuto":
+					break;
+				
+			}
+			
+		/* 	minute = this.logTime.substring(14, 16);
+		case "hora":
+			hour = this.logTime.substring(11, 13);
+		case "dia":
+			day = this.logTime.substring(8, 10);
+		case "mes":
+			year = parseInt(this.logTime.substring(0, 4),10) - 1900;
+			month = parseInt(this.logTime.substring(5, 7),10) -1; */
+			
+			return "Gráfico " + nomeTipo + "<br>Intervalo de " + nomeDataInicio + " até " + nomeDataFim + nomeDataComplemento;	
+		}		
+		
+		$("#report_type").change(atualiza_menu);		
+		$("#interval").change(atualiza_datetimepickers);
+		
+				
+		$("#report_type").change();
+		$("#interval").change();
+		
+		//$("#input_datetime_inicial").change(libera_geracao_grafico); //???
+		libera_geracao_grafico();
+		
+		
+		//$("#input_datetime_final")
+
+		// Garante a autenticação pelo método post
+		/*
+		 * $.ajaxSetup({ headers: { 'X-CSRF-TOKEN':
+		 * $('meta[name="_csrf"]').attr('content') } });
+		 */
+
+		function generate_graph(params) {
+			$("#loading").removeAttr("hidden");
+			$("#btn_generate_graph").attr('disabled', '');
+			$("#btn_generate_graph").attr('class', 'botao-travado');
+
+			var complete_data = new Object();
+
+			switch (params.report_type) {
+				case "top":
+					complete_data.quantidade = params.quantidade_top;
+				case "resumo":
+				case "resumoAssinantes":
+				case "grupo":
+				case "prioridade":
+					complete_data.listaAssinantes = params.group;
+					complete_data.tempoInicial = params.datetime_inicial;
+					complete_data.tempoFinal = params.datetime_final;
+					complete_data.unidadeTempo = params.interval
+					complete_data.tipoMsg = params.message_type;
+					break;
+				default:
+					break;
+			}
+			$.post(params.report_type, JSON.stringify(complete_data), function(
+					data) {
+				draw_graph(data, params.report_type, params.interval);
+				if (data.length != 0) {
+					gera_csv(data);
+				}
+				$("#loading").attr('hidden', '');
+				$("#btn_generate_graph").removeAttr('disabled');
+				$("#btn_generate_graph").attr('class', 'botao-livre');
+			});
+		}
+
+		 
+		 
+		 
+		 
+		 
+		/* Funçoes/açoes do grafico/flot */
+
+		var ticks = [];
+		var rawData = [];
+		var dataSet = [];
+		var options;
+		var previousPoint = null, previousLabel = null;
+
+		/*  $("<div id='tooltip'></div>").css({
+			position : "absolute",
+			display : "none",
+			border : "1px solid #fdd",
+			padding : "2px",
+			"background-color" : "#fee",
+			opacity : 0.80
+		}).appendTo("body");  */
+
+		
+		function cria_tooltip(objeto, tipo) {
+			objeto.bind("plothover",
+					function(event, pos, item) {
+						if (item) {
+							if ((previousLabel != item.series.label)
+									|| (previousPoint != item.dataIndex)) {
+								previousPoint = item.dataIndex;
+								previousLabel = item.series.label;
+								$("#tooltip").remove();								
+								var valor;
+								switch(tipo) {
+									case "barra":
+ 										valor = item.datapoint[0];
+										break;
+									case "linha":
+										valor = item.datapoint[1];
+										break;
+									default:
+										return; //Não há legenda
+										break;
+								}
+
+								var color = item.series.color;
+								showTooltip(
+										item.pageX,
+										item.pageY,
+										color,
+										//item.series.label
+										valor + " mensagens");												
+							}
+						} else {
+							$("#tooltip").remove();
+							previousPoint = null;
+						}
+					});
+		};
+		
+		
+		function showTooltip(x, y, color, contents) {
+			$('<div id="tooltip">' + contents + '</div>')
+					.css(
+							{
+								position : 'absolute',
+								display : 'none',
+								top : y - 10,
+								left : x + 10,
+								border : '2px solid ' + color,
+								padding : '3px',
+								'font-size' : '9px',
+								'border-radius' : '5px',
+								'background-color' : '#fff',
+								'font-family' : 'Verdana, Arial, Helvetica, Tahoma, sans-serif',
+								opacity : 0.9
+							}).appendTo("body").fadeIn(200);
+		}
+
+		function set_graph_top(graph_data) {
+			dataSet = [ {
+				label : "Mensagens por Assinante",
+				data : rawData,
+				color : "#5E5E5E"
+			} ];
+
+			var i = graph_data.length;
+			ticks = [];
+			$.each(graph_data, function() {
+				i--;
+				var ua_name;
+				if (this.assinante.indexOf("=") >= 0){
+					ua_name = this.assinante.split('=')[1].split("/")[0].split(",")[0];
+				} else {
+					ua_name = this.assinante;
+				}
+				ticks[i] = [ i, ua_name ];
+				rawData.push([ this.total, i ]);
+
+			});
+
+			options = {
+				series : {
+					bars : {
+						show : true,
+						color : "#FF0000"
+					},
+					valueLabels:
+	                {
+		                show: true,
+		                horizAlign: 'insideMax',		              
+		                decimals: 0,
+		                fontcolor: 'white',		               
+	                }
+				},
+				bars : {
+					align : "center",
+					barWidth : 0.5,
+					horizontal : true,
+					fillColor : {
+						colors : [ {
+							opacity : 0.5
+						}, {
+							opacity : 1
+						} ]
+					},
+					lineWidth : 1,					
+					color : "#FF0000"
+				},				              
+				xaxis : {
+					axisLabel : "Quantidade de mensagens no período",
+					axisLabelUseCanvas : true,
+					axisLabelPadding : 10,
+					color : "black",
+					tickColor : "#5E5E5E"// ,
+
+				},
+				yaxis : {
+					axisLabel : "Assinante",
+					axisLabelUseCanvas : true,
+					tickColor : "#5E5E5E",
+					ticks : ticks,
+					color : "black"
+				},
+				legend : {
+					container: $("#flot-legenda"),
+					noColumns : 0,
+					labelBoxBorderColor : "#858585",
+					position : "ne"
+				},
+				grid : {
+					hoverable : true,
+					// backgroundColor: { colors: ["#171717", "#4F4F4F"] },
+					borderWidth : 2
+				}
+			};
+		}
+
+		function set_graph_resumo(graph_data, interval) {
+
+			var max, min, max_grid, min_grid;
+			var datetime, year, month, day, hour, minute, timeformat_string;
+			var unidade_tempo;
+			$.each(graph_data, function() {				
+				switch (interval) { //Converte os valores de acordo com o padrão :S
+					case "minuto":
+						minute = this.logTime.substring(14, 16);
+					case "hora":
+						hour = this.logTime.substring(11, 13);
+					case "dia":
+						day = this.logTime.substring(8, 10);
+					case "mes":
+						year = parseInt(this.logTime.substring(0, 4),10) - 1900;
+						month = parseInt(this.logTime.substring(5, 7),10) -1;
+						break;	
+				}
+				
+				switch (interval) {
+				case "mes":
+					datetime = Date.UTC(year, month);
+					ticksize_string = "month";
+					unidade_tempo = "meses";
+					break;
+				case "dia":
+					datetime = Date.UTC(year, month, day);
+					ticksize_string = "day";
+					unidade_tempo = "dias";
+					break;
+				case "hora":
+					datetime = Date.UTC(year, month, day, hour);
+					ticksize_string = "hour";
+					unidade_tempo = "horas";
+					break;
+				case "minuto":
+					datetime = Date.UTC(year, month, day, hour, minute);
+					ticksize_string = "minute";
+					unidade_tempo = "minutos";
+					break;
+				}
+				/* if (rawData.length == 0){
+					datahora_seguinte = datetime;
+				}
+				while (datahora_seguinte != datetime) {
+					rawData.push([datahora_seguinte, 0]);
+					datahora_seguinte += intervalo;			
+				} */
+				rawData.push([ datetime, this.total ]);
+			});
+
+			// Verifica e define maximo e minimo			
+			max = 0;
+			min = Number.POSITIVE_INFINITY;			
+			for (var i = 0; i < graph_data.length; i++) {				
+				if (parseInt(rawData[i][1],10) > parseInt(max,10) ) {
+					max = rawData[i][1];					
+				}
+				if (parseInt(rawData[i][1],10) < min) {
+					min = rawData[i][1];
+				}
+			}
+			
+			// Verifica e define o valor mínimo e máximo para o grid baseado na sua
+			// amplitude
+			var grid_amp = max - min;
+			max_grid = max + 0, 1 * grid_amp;
+			min_grid = min - 0, 1 * grid_amp;
+			if (parseInt(min_grid,10) < 0) {
+				min_grid = 0;
+			}
+
+			// Esvazia e define os novos picos
+			var picos = [];
+			for (var i = 1; i <= rawData.length; i += 1) {
+				if (rawData[i - 1][1] == max) { // O índice do array começa em zero,
+					var primeiro_valorX = rawData[0][0];
+					var ultimo_valorX = rawData[rawData.length -1][0];
+					var data_picoX = rawData[i-1][0];
+					
+					picos.push([primeiro_valorX,max]);
+					picos.push([data_picoX,max]);
+					picos.push([ultimo_valorX,max]);				
+				}
+			}
+			dataSet = [ {				 
+				label : "Limite Pico (" + max + ")",
+				 data: picos,
+				 color: "#6DC0D1"				
+			}  , {
+				label : "Quantidade",
+				color : "#FF8848",
+				data : rawData
+			}
+			];
+
+			options = {
+				grid : {
+					hoverable : true,
+					clickable : true
+				},
+				series: {
+	                   lines: { show: true },
+	                   points: { show: true }
+	            },
+				legend: {
+					container: $("#flot-legenda")
+				},
+				xaxis : {
+					axisLabel: 'tempo em ' + unidade_tempo,
+					mode : "time",
+					axisLabelPadding : 5,
+					ticksize : [ 1, ticksize_string ]
+				},
+				yaxis : {
+					axisLabel: 'Quantidade de mensagens',
+					position: 'left',
+					axisLabelPadding : 5,
+					tickDecimals : 0
+				}
+			};
+
+		}
+
+		function set_graph_grupo(graph_data) {
+			dataSet = [ {
+				label : "Mensagens por grupo",
+				data : rawData,
+				color : "#5E5E5E"
+			} ];
+
+			var i = 1;
+			var grupo = [];
+			$.each(graph_data, function() {
+				grupo.push(["Grupo " + i, this.total]);				
+				i++;
+			});			
+			grupo.sort(function(x,y) {				
+				return x[1] - y[1];
+			});
+			
+			i = 0;
+			$.each(grupo, function() {
+				ticks[i] = [i, this[0]];
+				rawData.push([ this[1], i ]);
+				i++;
+			});
+			
+			options = {
+				series : {
+					bars : {
+						show : true
+					},
+					valueLabels:
+	                {
+		                show: true,
+		                horizAlign: 'insideMax',
+		                decimals: 0,		                	                
+		                fontcolor: 'white',		                
+	                }
+				},
+				bars : {
+					align : "center",
+					barWidth : 0.5,
+					horizontal : true,
+					lineWidth : "#A8A8A8"
+				},
+				xaxis : {
+					axisLabel : "Quantidade de mensagens no período",
+					axisLabelUseCanvas : true,
+					axisLabelPadding : 10,
+					tickColor : "#5E5E5E"// ,
+				},
+				yaxis : {
+					axisLabel : "Assinante",
+					axisLabelUseCanvas : true,
+					axisLabelPadding : 5,
+					tickColor : "#5E5E5E",
+					ticks : ticks,
+					color : "black"
+				},
+				legend : {
+					container: $("#flot-legenda"),
+					noColumns : 0,
+					labelBoxBorderColor : "#858585",
+					position : "ne"
+				}
+			};
+		}
+
+		function set_graph_prioridade(graph_data) {
+			dataSet.length = 0; //
+			var i = 0;			
+						
+			$.each(graph_data, function() {
+				dataSet.push({					
+					label : "Prioridade " + this.prioridade,
+					data : parseInt(this.total)
+				});
+				i++;
+			});
+			options = {
+				series: {
+			        pie: {
+			            show: true,
+			            radius: 3/4,			            
+			            label: {
+			                show: true,
+			                radius: 3/4,
+			                formatter: function(label,point){
+			                	debugger;
+			                    return label+"<br>"+point.percent.toFixed(2)+"% ("+point.data[0][1]+" mensagens"+")";
+			                }			                
+			            }
+			        }
+			    },
+			    legend: {
+			        show: false
+			    }
+			};
+		}
+
+		function draw_graph(graph_data, report_type, interval) {
+			limpa_flot();			
+			if (graph_data.length == 0) {
+				$("#flot-placeholder").append(
+						"<p>Não há dados no período selecionado</p>");
+				return 0;
+			}
+			ticks.length = rawData.length = dataSet.legth = 0;
+			var tipoGrafico = "";
+			switch (report_type) {
+				case "top":
+					set_graph_top(graph_data);
+					tipoGrafico = "barra";
+					break;
+				case "grupo":
+					set_graph_grupo(graph_data);
+					tipoGrafico = "barra";
+					break;
+				case "resumo":
+					set_graph_resumo(graph_data, interval);
+					tipoGrafico = "linha";
+					break;
+				case "prioridade":
+					set_graph_prioridade(graph_data);
+					break;
+				case "resumoAssinantes":
+					limpa_flot();
+					$("#flot-placeholder")
+							.append(
+									"<p>Este relatório está disponível apenas no formato .csv</p>");
+					return;
+				default:
+					$("#flot-placeholder").append(
+							"<p>Tipo de relatório inválido</p>");
+					console.log("Tipo de relatório " + data_type + " não existe");
+					break;
+			}
+			$("#flot-placeholder").unbind();
+			$.plot($("#flot-placeholder"), dataSet, options);
+			cria_tooltip($("#flot-placeholder"), tipoGrafico);			
+		}
+		
+		function limpa_flot(){
+			$("#flot-legenda").empty();
+			$("#flot-placeholder").empty();
+		}
+	});
+</script>
+
+

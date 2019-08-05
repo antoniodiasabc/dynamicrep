@@ -1,0 +1,338 @@
+<!-- <div id="content_flot">
+	antes
+	<div style="align: center; width:auto;height:400px;margin:15px;">
+		<div id="flot-placeholder" style="width:100%;height:100%;"  ></div>
+	</div>
+	depois
+</div>
+ -->
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+	<title>Gráficos estatśticos AMHS - Atech - TOP 10</title>
+	
+	<link rel="stylesheet" href="../api/jQuery-Timepicker-Addon-master/dist/jquery-ui-timepicker-addon.css"> 
+	<link rel="stylesheet" href="../api/jquery-ui-1.12.0/jquery-ui.css">
+	<script type="text/javascript" src="../api/flot/jquery.js"></script>
+	<script type="text/javascript" src="../api/flot/jquery.flot.js"></script>
+	<script type="text/javascript" src="../api/flot/jquery.flot.time.js"></script>	
+	<script type="text/javascript" src="../api/flot/jquery.flot.symbol.js"></script>
+	<script type="text/javascript" src="../api/jquery-ui-1.12.0/jquery-ui.js"></script>
+	<script type="text/javascript" src="../api/jquery-ui-1.12.0/i18n/datepicker-pt-BR.js"></script>
+	<script type="text/javascript" src="../api/jQuery-Timepicker-Addon-master/dist/jquery-ui-timepicker-addon.js"></script>
+	<script type="text/javascript" src="../api/jQuery-Timepicker-Addon-master/dist/i18n/jquery-ui-timepicker-pt-BR.js"></script>
+    <script type="text/javascript" src="../api/flot/jquery.flot.min.js"></script>
+    
+    <script type="text/javascript" src="../api/jsPDF-master/jspdf.js"></script>
+    <script type="text/javascript" src="../api/jsPDF-master/libs/html2canvas/dist/html2canvas.js"></script>
+    <script type="text/javascript" src="../api/jsPDF-master/plugins/addimage.js"></script>
+    <script type="text/javascript" src="../api/jsPDF-master/plugins/png_support.js"></script>
+    <script type="text/javascript" src="../api/jsPDF-master/libs/png_support/png.js"></script>
+    <script type="text/javascript" src="../api/jsPDF-master/libs/png_support/zlib.js"></script>
+    <script type="text/javascript" src="../api/FileSaver.js-master/FileSaver.min.js"></script>
+
+	<script>
+    var ticks = [];
+	var rawData = []; //, [28.95, 1],[1603, 2],[774, 3],[1245, 4], [85, 5],[1025, 6]];
+	var dataSet = [{ label: "Mensagens por Assinante", data: rawData, color: "#E8E800" }];
+	
+    var previousPoint = null, previousLabel = null;
+
+
+	var options = {
+            series: {
+                bars: {
+                    show: true
+                }
+            },
+            bars: {
+                align: "center",
+                barWidth: 0.5,
+                horizontal: true,
+                fillColor: { colors: [{ opacity: 0.5 }, { opacity: 1}] },
+                lineWidth: 1
+            },
+            xaxis: {
+                axisLabel: "Qtd de Mensagens no Periodo",
+                axisLabelUseCanvas: true,
+                axisLabelFontSizePixels: 12,
+                axisLabelFontFamily: 'Verdana, Arial',
+                axisLabelPadding: 10,
+                //max: 2000,
+                tickColor: "#5E5E5E",
+               // tickFormatter: function (v, axis) {
+               //     return $.formatNumber(v, { format: "#,###", locale: "us" });
+               // },
+                color: "black"
+            },
+            yaxis: {
+                axisLabel: "Assinante",
+                axisLabelUseCanvas: true,
+                axisLabelFontSizePixels: 12,
+                axisLabelFontFamily: 'Verdana, Arial',
+                axisLabelPadding: 3,
+                tickColor: "#5E5E5E",
+                ticks: ticks,
+                color: "black"
+            },
+            legend: {
+                noColumns: 0,
+                labelBoxBorderColor: "#858585",
+                position: "ne"
+            },
+            grid: {
+                hoverable: true,
+                borderWidth: 2,
+                backgroundColor: { colors: ["#171717", "#4F4F4F"] }
+            }
+        };
+ 
+ 
+        var previousPoint = null, previousLabel = null;
+ 
+        $.fn.UseTooltip = function () {
+            $(this).bind("plothover", function (event, pos, item) {
+                if (item) {
+                	//debugger;
+                    if ((previousLabel != item.series.label) ||
+                 (previousPoint != item.dataIndex)) {
+                        previousPoint = item.dataIndex;
+                        previousLabel = item.series.label;
+                        $("#tooltip").remove();
+ 
+                        var x = item.datapoint[0];
+                        var y = item.datapoint[1];
+ 
+                        var color = item.series.color;
+                        //alert(color)
+                        //console.log(item.series.xaxis.ticks[x].label);               
+ 
+                        showTooltip(item.pageX,
+                        item.pageY,
+                        color,
+                        "<strong>" + item.series.label + "</strong><br>" + item.series.yaxis.ticks[y].label);
+                    }
+                } else {
+                    $("#tooltip").remove();
+                    previousPoint = null;
+                }
+            });
+        };
+ 
+        function showTooltip(x, y, color, contents) {
+            $('<div id="tooltip">' + contents + '</div>').css({
+                position: 'absolute',
+                display: 'none',
+                top: y - 10,
+                left: x + 10,
+                border: '2px solid ' + color,
+                padding: '3px',
+                'font-size': '9px',
+                'border-radius': '5px',
+                'background-color': '#fff',
+                'font-family': 'Verdana, Arial, Helvetica, Tahoma, sans-serif',
+                opacity: 0.9
+            }).appendTo("body").fadeIn(200);
+        }
+        
+        
+        // termino flot bar example
+	
+
+
+	function constroeGrafico(string_dados_json) {
+		var data;
+		var plot;
+		var graph = [];
+		var picos = [];
+		var max, min, max_grid, min_grid;		
+		
+		//var ticks = [];
+		//var rawData = []; //, [28.95, 1],[1603, 2],[774, 3],[1245, 4], [85, 5],[1025, 6]];
+	    dataSet = [{ label: "Mensagens por Assinante", data: rawData, color: "#E8E800" }];
+	   // ticks= [];
+	    //rawData= [];
+		
+		var i = 0;
+
+		$.each(string_dados_json, function () {
+			var dateStr = this.logTime.split("-");
+			var timeY = parseInt(dateStr[0], 10);
+			var timeM = parseInt(dateStr[1], 10) -1;
+			var timeD = parseInt(dateStr[2], 10);
+			
+			//var time = new Date(this.logTime.split("-").reverse().join("-")).getTime();
+			var time = new Date(timeY, timeM, timeD).getTime();
+			ticks.push([i, this.assinante.split('=')[1].split("/")[0].split(",")[0]]);
+			rawData.push([this.total, i]);
+			//debugger;
+			//graph.push([this.assinante , this.total]);
+			i++;
+		});
+
+		//Verifica e define maximo e minimo
+		max = 0;
+		min = Number.POSITIVE_INFINITY;
+		for(var i = 0; i < graph.length; i++) {
+			if(graph[i][1] > max) { max = graph[i][1]; }
+			if(graph[i][1] < min) { min = graph[i][1]; }
+		}
+		
+		//Verifica e define o valor minimo e maximo para o grid baseado na sua amplitude
+		var grid_amp = max - min;
+		max_grid = max + 0,1*grid_amp;
+		min_grid = min - 0,1*grid_amp;
+		if (min_grid < 0) { min_grid = 0;}
+
+		//Esvazia e define os novos picos
+		picos = [];
+		for (var i = 1; i <= graph.length; i +=1){
+			if (graph[i-1][1] == max) { //O indice do array começa em zero, porem os pontos começam em 1
+				picos.push([i,max]);
+			}
+		}
+		
+		
+	    
+	    $.plot($("#flot-placeholder"), dataSet, options);
+        $("#flot-placeholder").UseTooltip();
+			
+
+	}
+
+	function generate_graph(){		
+		var data_hora = document.getElementById("momento_inicial").value;
+		if (data_hora) {
+			var parametro = 'logtime="' + data_hora + '"';
+			alert(parametro);
+			loadData(parametro);			
+		}
+		$("#btn_generate_pdf").removeAttr("disabled");
+	}
+
+	function loadData(get_params){	
+		var strParam = "top10?" + get_params + '&unidadeTempo="dia"&tipoMsg="recebidas"';
+		$.get( strParam, function(data) {
+			constroeGrafico(data);
+			gera_csv(data);
+			});
+	}
+	
+	function gera_csv(data_json){
+		//Gera conteudo do .csv
+		var csv_content = "";
+		
+		$.each(data_json, function () {
+			//if graphic type = top10, then...
+			csv_content += "\"" + this.assinante + "\"," + this.total + "\n";			
+		});
+							
+		//Organiza .csv em arquivo para download
+		var type = $( "#tipo_relatorio" ).val();
+		var date = $( "#momento_inicial_old").val();
+		var interval = $( "#intervalo" ).val();		
+		$( "#acsv" ).attr("download",date + "-" + interval + "-" + type + ".csv");
+		$( "#acsv" ).attr("href","data:text/csv;charset=utf-8;base64," + window.btoa(csv_content));
+	}
+	
+	function download_csv(){
+		$( "#acsv" ).click();
+	}
+	
+	function download_pdf(){		
+		html2canvas($("#flot-placeholder").get(0), {
+			onrendered: function(canvas) {
+				var imgData = canvas.toDataURL('image/png');
+				var imgWidth = 270;
+				var imgHeight = (imgWidth * canvas.height)/canvas.width;
+				var type = $( "#tipo_relatorio" ).val();
+				var date = $( "#momento_inicial_old").val();
+				var interval = $( "#intervalo" ).val();
+				var doc = new jsPDF('landscape');
+				
+				doc.text(5, 10, "Grafico das TOP 10 mensagens - " + date);
+				doc.addImage(imgData, 'png', 12, 10, imgWidth, imgHeight);
+								
+				setTimeout(function() { //Sem um tempo de atraso o download simplesmente nao funciona no Firefox
+					doc.save(date + "-" + interval + "-" + type + ".pdf");
+				}, 1000);
+			}
+		});		
+	}
+		
+	$(function() {
+				
+		$("<div id='tooltip'></div>").css({
+			position: "absolute",
+			display: "none",
+			border: "1px solid #fdd",
+			padding: "2px",
+			"background-color": "#fee",
+			opacity: 0.80
+		}).appendTo("body");
+
+
+		$( "#momento_inicial_old" ).datetimepicker({ 
+			timeFormat: "hh:mm:ss"
+		});
+
+		/*$("#placeholder").bind("plothover", function (event, pos, item) {
+			console.log("Passei por aqui");
+			if (item) {
+				var x = item.datapoint[0].toFixed(2),
+					y = item.datapoint[1].toFixed(2);
+				console.log(item.series);
+				$("#tooltip").html(item.series.label + " of " + x + " = " + y)
+					.css({top: item.pageY+5, left: item.pageX+5})
+					.fadeIn(200);
+			} else {
+				$("#tooltip").hide();
+			}
+		});*/
+	
+	});
+	
+	</script>
+</head>
+<body>
+<div id="content_flot" style="align: center; width:auto;height:400px;margin:15px;">
+		<div id="flot-placeholder" style="width:100%;height:100%;"  ></div>
+</div>
+<!-- 	
+	<div id="actions_button"> 
+		<button id="btn_generate_graph" onclick="generate_graph()">Gerar grafico</button>
+		<button id="btn_generate_pdf" type="button" onclick="download_pdf()" disabled>Baixar .pdf</button>
+		<a href="#" id="acsv" download="#">Baixar .csv</a>
+	</div>	
+	<div id="content_flot" style="align: center; width:auto;height:400px;margin:15px;">
+		<div id="flot-placeholder" style="width:100%;height:100%;"  ></div>
+	</div>
+-->
+<!-- 	
+<div id="header_old">
+	</div>	
+	<td align="left">
+		Tipo de Relatorio
+		<br>
+		<select id="tipo_relatorio" onchange="atualizaIntervalo()">			
+			<option value="top10">Top 10</option>
+			<option value="resumo">Resumo mensal</option>
+			<option value="comparativo">Comparativo</option>
+			<option value="prioridade">Comparativo com prioridades</option>
+		</select>
+	</td>
+	<div id="options"> 
+		Selecione o tamanho do intervalo desejado
+		<select id="intervalo" onchange="atualizaIntervalo()">			
+			<option value="minuto">minuto</option>
+			<option value="hora">hora</option>
+			<option value="dia">dia</option>
+			<option value="mes">mês</option>
+		</select>
+		<p> Selecione o momento inicial do gráfico: <input type="text" id="momento_inicial_old" onchange="generate_graph()" readonly="true"> </p>
+	</div>
+ -->
+
+</body>
+</html>

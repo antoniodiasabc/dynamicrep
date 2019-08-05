@@ -1,0 +1,56 @@
+<html>
+
+<head>
+<title>Modulo Estatistico::Gerenciar Usuario</title>
+<script src="../api/jquery/jquery-3.1.1.min.js"></script>
+<script type="text/javascript">
+
+$(document).ready(function() {
+	var isSessionExpired;
+	$.get("/currentRole", function(data){
+		if(data == 'Admin'){
+			$('#admin').show();
+			$('#operador').hide();
+		}else{
+			$('#admin').hide();
+			$('#operador').show();				
+		}
+	});
+	
+	$.get("/currentUserLoged", function(data){
+		$("#userLogin").append('<p>Usu&aacute;rio: ' + data + '</p>');
+		return data;		
+	});
+	
+	setInterval (function(){		
+		$.get("/currentUserLoged", function(data){
+			if(data.length > 50){
+				isSessionExpired = true;
+			}
+		});
+	    if(isSessionExpired){
+	        window.location.href='/login';
+	    }
+	}, 30000 );
+	
+});
+
+</script>
+<div class="cabecalho">
+	<table style="width:100%">
+		<td align="left" width="245px"><img src="/estatistica/imgs/logo_cindactaI.png" alt="Logo CINDACTA I" style="width:95px;height:118px;"></td>
+		<td>
+		<div id="userLogin">		
+		</div>
+		<div id="admin" >
+		  <div><a href="/admin.html">Menu</a></div>
+		</div>
+		<div id="operador">	
+		  <div><a href="/operador.html">Menu</a></div>
+		</div>	
+		</td>
+		<td align="center"><h1>MÓDULO ESTATÍSTICO - AMHS</h1></td>	
+		<td align="right" width="245px"><img src="/estatistica/imgs/logo_atech.png" alt="Logo Atech - Grupo Embraer" style="width:245px;height:102px;"></td>
+	</table>
+</div>
+</html>

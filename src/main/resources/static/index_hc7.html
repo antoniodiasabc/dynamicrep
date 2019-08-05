@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<script src="https://code.jquery.com/jquery-1.12.4.js"></script>
+<script src="https://code.highcharts.com/highcharts.js"></script>
+<script src="https://code.highcharts.com/modules/data.js"></script>
+<script src="https://code.highcharts.com/modules/drilldown.js"></script>
+
+</head>
+
+<body style="background: #212224;">
+
+	<div id="high" style="max-width: 1666px; margin: 0 auto"></div>
+	<script type="text/javascript">
+		function getData(name) {
+			var result = null;
+			var scriptUrl = "http://localhost:8080/fenomenaByMonthBR?ini=201705&end=201801&fenomeno=CB&drilldown=T2&name=" + name;
+			$.ajax({
+				url : scriptUrl,
+				type : 'get',
+				dataType : 'json',
+				async : false,
+				success : function(data) {
+					result = data.drilldown;
+				}
+			});
+			return result;
+		}
+
+		var options = {
+			chart : {
+				renderTo : 'high',
+				type : 'column',
+				events : {
+					drilldown : function(e) {
+						if (!e.seriesOptions) {
+							data = getData(e.point.name).series[0];
+							var chart = this;
+							chart.addSeriesAsDrilldown(e.point, data);
+							console.log(data);
+							//  console.log(chart);
+						}
+					}
+				}
+			},
+
+			plotOptions : {
+				series : {
+					borderWidth : 0,
+					dataLabels : {
+						enabled : true
+					}
+				}
+			},
+
+			legend : {
+				enabled : true
+			},
+
+			xAxis : {
+				categories : []
+			},
+
+			series : [ {} ],
+			drilldown : {}
+		};
+
+		$.getJSON('http://localhost:8080/fenomenaByMonthBR?ini=201701&end=201803&fenomeno=CB&drilldown=T2',
+						function(data) {
+							options.series = data.series;
+							//options.drilldown = data.drilldown;
+							console.log(data.drilldown);
+							var chart = new Highcharts.Chart(options);
+						});
+	</script>
+
+
+</body>
+</html>

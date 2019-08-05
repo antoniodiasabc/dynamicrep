@@ -1,0 +1,1465 @@
+<!DOCTYPE html>
+<html>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+
+<link rel="stylesheet"
+	href="../api/jQuery-Timepicker-Addon-master/dist/jquery-ui-timepicker-addon.css">
+<link rel="stylesheet" href="../api/jquery-ui-1.12.0/jquery-ui.css">
+<link rel="stylesheet" href="../api/chosen/chosen.css">
+<script type="text/javascript"
+	src="../api/jquery-ui-1.12.0/jquery-ui.js"></script>
+<script type="text/javascript"
+	src="../api/jquery-ui-1.12.0/i18n/datepicker-pt-BR.js"></script>
+<script type="text/javascript"
+	src="../api/jQuery-Timepicker-Addon-master/dist/jquery-ui-timepicker-addon.js"></script>
+<script type="text/javascript"
+	src="../api/jQuery-Timepicker-Addon-master/dist/i18n/jquery-ui-timepicker-pt-BR.js"></script>
+<script type="text/javascript" src="../api/chosen/chosen.jquery.js"></script>
+
+<!-- Imports para o grafico  -->
+<script type="text/javascript" src="../api/flot/jquery.flot.js"></script>
+<script type="text/javascript" src="../api/flot/jquery.flot.time.js"></script>
+<script type="text/javascript" src="../api/flot/jquery.flot.symbol.js"></script>
+<script type="text/javascript" src="../api/flot/jquery.flot.pie.js"></script>
+<script type="text/javascript" src="../api/flot/jquery.flot.pie.js"></script>
+<script type="text/javascript"
+	src="../api/flot/flot-axislabels/jquery.flot.axislabels.js"></script>
+<script type="text/javascript"
+	src="../api/flot/flot-valuelabels/jquery.flot.valuelabels.js"></script>
+
+<script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
+<script src="./js/code/highcharts.js"></script>
+<script src="./js/code/modules/exporting.js"></script>
+<script src="./js/code/modules/export-data.js"></script>
+<script src="./js/code/modules/drilldown.js"></script>
+
+
+<style>
+.botao-travado {
+	display: block;
+	width: 115px;
+	height: 20px;
+	background: gray-light;
+	padding: 0px;
+	text-align: center;
+	border-radius: 5px;
+	color: gray;
+	font-weight: bold;
+}
+
+.botao-livre {
+	display: block;
+	width: 115px;
+	height: 20px;
+	background: #4E9CAF;
+	padding: 0px;
+	text-align: center;
+	border-radius: 5px;
+	color: white;
+	font-weight: bold;
+}
+</style>
+
+<div id="functionalities_menu" class="menu">
+	<div id="parameters">
+		<table id="table_menu">
+			<tr class="permanent_tr">
+
+				<td class="permanent_td" align="left">Tipo de Relatório <br>
+					<select id="report_type">
+						<option value="resumo">Mensagens</option>
+						<option value="top">Atraso</option>
+						<option value="grupo">Ausência</option>
+						<option value="prioridade">Mensagens Erradas</option>
+				</select>
+				</td>
+				<td class="permanent_td" align="left">Período <br> <select
+					id="interval">
+						<option value="ano">ano</option>
+						<option value="mes">mes</option>
+						<option value="dia">dia</option>
+						<option value="hora">hora</option>
+				</select>
+				</td>
+				<td class="permanent_td" align="left">Data Inicial: <br> <input
+					type="text" id="input_datetime_inicial" readonly>
+				</td>
+				<td class="permanent_td" align="left">Data Final: <br> <input
+					type="text" id="input_datetime_final" readonly>
+				</td>
+
+			</tr>
+		</table>
+	</div>
+	<div id="group_menu"></div>
+	<div id="actions_buttons">
+		<table>
+			<tr>
+				<td><button id="btn_generate_graph" class="botao-travado"
+						disabled>Gerar Relatório</button></td>
+				<td><img id="loading" src="../estatistica/imgs/loading.gif"
+					alt="carregando" hidden></img></td>
+			</tr>
+		</table>
+	</div>
+</div>
+
+<div id="container"
+	style="min-width: 310px; height: 400px; margin: 0 auto"></div>
+
+<script>
+
+var serieData = [];
+
+var highchartsOptions = Highcharts.setOptions({
+	lang : {
+		loading : 'Aguarde...',
+		months : [ 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio',
+				'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro',
+				'Novembro', 'Dezembro' ],
+		weekdays : [ 'Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta',
+				'Sexta', 'Sábado' ],
+		shortMonths : [ 'Jan', 'Feb', 'Mar', 'Abr', 'Maio', 'Jun',
+				'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez' ],
+		exportButtonTitle : "Exportar",
+		printButtonTitle : "Imprimir",
+		rangeSelectorFrom : "De",
+		rangeSelectorTo : "Até",
+		rangeSelectorZoom : "Periodo",
+		downloadPNG : 'Download imagem PNG',
+		downloadJPEG : 'Download imagem JPEG',
+		downloadPDF : 'Download documento PDF',
+		downloadSVG : 'Download imagem SVG'
+	// resetZoom: "Reset",
+	// resetZoomTitle: "Reset,
+	// thousandsSep: ".",
+	// decimalPoint: ','
+	}
+});
+
+	$(function() {
+
+		/* FunÃ§oes/aÃ§oes do Menu */
+		var uas_list = [];
+		var address_get_uas_list = "/listaCaas";
+		var uas_selected = [];
+
+		$("#btn_generate_graph").click( function() {
+			var datetime_inicial = $("#input_datetime_inicial").val();
+			var datetime_final = $("#input_datetime_final").val();
+			var tipoIntervalo =  $("#interval").val();
+			
+			if(datetime_inicial == "" || datetime_final == ""){
+				alert("Ã‰ necessÃ¡rio preencher ambas data inicial e final para gerar o grÃ¡fico");
+				return false;
+			}
+			if(!validaData(datetime_inicial,datetime_final,tipoIntervalo)) {
+				mensagemErro = "Intervalo de datas invÃ¡lido: ";
+				if (datetime_inicial > datetime_final) {
+					mensagemErro += "data inicial superior Ã  final.";
+				} else if (datetime_inicial == datetime_final){
+					mensagemErro += "data inicial igual Ã  final.";
+				} else {
+					mensagemErro += "perÃ­odo supera o limite de ";
+					switch(tipoIntervalo){
+						case "ano":
+							mensagemErro += "20 anos.";
+							break;
+						case "hora":
+							mensagemErro += "24 horas.";
+							break;
+						case "dia":
+							mensagemErro += "1 mÃªs.";
+							break;
+						case "mes":
+							mensagemErro += "12 meses.";
+							break;
+						default:
+							mensagemErro += "[intervalo selecionado invÃ¡lido]";	
+							break;
+					}
+				}
+				alert(mensagemErro);
+				return false;
+			}			
+			var params = [];
+			params["report_type"] = $("#report_type").val(); // Tipo de relatÃ³rio
+			params["message_type"] = $("#message_type").val(); // Tipo de mensagem
+			params["interval"] = $("#interval").val(); // Valor do intervalo
+			params["datetime_inicial"] = datetime_inicial; // PerÃ­odo
+			params["datetime_final"] = datetime_final; // PerÃ­odo
+			params["quantidade_top"] = $("#quantidade_top").val();
+			params["fenomeno"] = $("#fenomeno").val();
+
+			if ($("#group_menu").text() != "") {
+
+				var group = [];
+				var grupoVazio = false;
+				var erroComGrupos = false;
+				$.each($("#group_menu").find("ul.chosen-choices"), function() {
+					var uas = [];
+					var empty = true;
+					$.each($(this).find('li.search-choice'), function() {
+						uas.push($(this).find('span').text());
+						empty = false;
+					});
+					if (!empty) {
+						group.push(uas);
+						if(grupoVazio) {
+							alert("Grupos intermediÃ¡rios nÃ£o podem ficar vazios");
+							erroComGrupos = true;
+							return false;
+						}
+					} else {
+						grupoVazio = true;							
+					}						
+				});
+				if(erroComGrupos) {
+					return false;
+				}
+				if (group.length == 1
+						&& params["report_type"] != "grupo") { //Se sÃ³ houver um grupo, transforma a lista de grupos em um 'unico grupo
+					var aux = group.pop();
+					group = aux;
+				}
+				if (group.length == 0
+						&& params["report_type"] == "grupo") {
+					alert("Para gerar o grÃ¡fico Ã© necessÃ¡rio informar assinantes");
+					return;
+				}
+				if (group.length == 1
+						&& params["report_type"] == "grupo"){
+					alert("Para gerar o grÃ¡fico comparativo por grupo Ã© necessÃ¡rio informar assinantes em mais de um grupo");
+					return;
+				}					
+				
+				params['group'] = group;
+			}
+			generate_graph(params);
+			$("#btn_generate_pdf").removeAttr("disabled");
+			$("#btn_generate_pdf").attr("class", "botao-livre");
+		});
+
+		function add_message_type_option(td, type) {
+			switch (type) {
+			case "top":
+				td
+						.after('<td align="left">\
+						Quantidade\
+						<br>\
+						<select id="quantidade_top"">\
+							<option value="5">5</option>\
+							<option value="10">10</option>\
+							<option value="15">15</option>\
+							<option value="30">30</option>\
+						</select>\
+						<td align="left">\
+						Tipo de mensagem\
+						<br>\
+						<select id="message_type"">\
+							<option value="recebidas">Recebidas</option>\
+							<option value="transferidas">Transferidas</option>\
+						</select>\
+					</td>\
+				');
+				break;
+			case "resumo":
+				td.after('<td align="left">\
+						Tipo de mensagem\
+						<br>\
+						<select id="message_type"">\
+							<option value="METAR">METAR/SPECI</option>\
+							<option value="TAF">TAF</option>\
+							<option value="SIGMET">SIGMET</option>\
+							<option value="AIRMET">AIRMET</option>\
+						</select>\
+					</td>\
+					<td align="left">\
+					Fenômeno:\
+					<br>\
+					<input type="text" size="5"	id="fenomeno"/>\
+				</td>\
+				');
+				break;
+			case "resumoAssinantes":
+				td.after('<td align="left">\
+						Tipo de mensagem\
+						<br>\
+						<select id="message_type"">\
+							<option value="recebidas">Recebidas</option>\
+							<option value="transferidas">Transferidas</option>\
+							<option value="rejeitadas">Rejeitadas</option>\
+						</select>\
+					</td>\
+				');
+				break;
+			case "grupo":
+				td
+						.after('<td align="left">\
+						Tipo de mensagem\
+						<br>\
+						<select id="message_type"">\
+							<option value="recebidas">Recebidas</option>\
+							<!-- <option value="transferidas">Transferidas</option> -->\
+							<option value="entregues_localmente">Entregues localmente</option>\
+							<option value="recebidas_entregues_localmente">Recebidas + Entregues localmente</option>\
+							<option value="rejeitadas">Rejeitadas</option>\
+						</select>\
+					</td>\
+				');
+				break;
+			case "prioridade":
+				td
+						.after('<td align="left">\
+						Tipo de mensagem\
+						<br>\
+						<select id="message_type"">\
+							<option value="recebidas">Recebidas</option>\
+							<option value="transferidas">Transferidas</option>\
+						</select>\
+					</td>\
+				');
+				break;
+			}
+		}
+
+		function add_group_option(num_groups) {
+			if (uas_list.length == 0) {
+				$.get(address_get_uas_list, function(data) {
+					uas_list = data;
+					add_data_group_option(num_groups);
+				});
+			} else {
+				add_data_group_option(num_groups);
+			}
+			uas_selected.length = 0;
+
+		}
+
+		function cria_tabela_selecao_grupos() {
+			var tabela = $("#table_group").text();
+			if (tabela == "") {
+				$("#group_menu")
+						.append(
+								'<table id="table_group">\
+					<tr id="tr_group_option" align="left">\
+					<style>td {vertical-align:top, width:25%;}</style>\
+					</tr></table>');
+			}
+		}
+
+		function adiciona_grupo(nome, id) {
+			$("#table_group")
+					.append(
+							'<td>'
+									+ nome
+									+ '<br>\
+				<select id="'+id+'" multiple class="chosen">\
+				</td>');
+			make_uas_list_li($("#" + id));
+		}
+
+		function adiciona_botao_novogrupo() {
+			$("#table_group")
+					.append(
+							'<td>\
+				<button id="btn_novogrupo" type="button">Adicionar novo grupo</button>\
+				</td>');
+			$("#btn_novogrupo").on(
+					'click',
+					function() {
+						$("#table_group").find("#btn_novogrupo").parent()
+								.remove();
+						var numero_grupo = $("#table_group td").length + 1;
+						adiciona_grupo("Grupo " + numero_grupo, "select_grupo"
+								+ numero_grupo);
+						if (parseInt(numero_grupo,10) < 8) {
+							adiciona_botao_novogrupo();
+						}
+					});
+		}
+
+		function add_data_group_option(num_groups) {
+			cria_tabela_selecao_grupos();
+			if (parseInt(num_groups,10) > 1) {
+				adiciona_grupo("Grupo 1", "select_grupo1");
+				adiciona_grupo("Grupo 2", "select_grupo2");
+				adiciona_botao_novogrupo();
+			} else {
+				adiciona_grupo("Grupo de assinantes", "select_grupo");
+			}
+
+		}
+
+		function make_uas_list_li(select) {
+			select.empty();
+			$.each(uas_list, function() {
+				//var cn = this;
+				var cn = this.split('=')[1].split("/")[0].split(",")[0];
+				select.append('<option value="' + this + '">' + cn
+						+ '</option>');
+			});
+			select.chosen({
+				search_contains : true,
+				no_results_text: "Nada encontrado para o filtro",
+				placeholder_text_multiple: "Selecione algumas opÃ§Ãµes"
+			});
+		}
+
+		function remove_noncommom_options() {
+			$("#group_menu").empty();
+			$("#table_menu tr").each(function(index) {
+				if ($(this).attr('class') != "permanent_tr") {
+					this.remove();
+				}
+			});
+			$("#table_menu td").each(function(index) {
+				if ($(this).attr('class') != "permanent_td") {
+					this.remove();
+				}
+			});
+		}
+		
+		function validaData(inicio, fim, tipoIntervalo){
+			
+			function imprimeErro(){
+				console.log("Data invÃ¡lida");
+			}			
+			
+			var diferencaAno = parseInt(fim.substring(0,4)) - parseInt(inicio.substring(0,4));
+			var diferencaMes;
+			var diferencaDia;
+			var diferencaHora;
+			var diferencaMinuto;
+			
+			//calcula diferenca dos meses
+			if( diferencaAno < 0 || diferencaAno > 1) {
+				imprimeErro();
+				return false;
+			} else if(diferencaAno == 0) {
+				diferencaMes = parseInt(fim.substring(5,7)) - parseInt(inicio.substring(5,7));	
+			} else { //diferencaAno == 1
+				diferencaMes = parseInt(fim.substring(5,7)) + (12 - parseInt(inicio.substring(5,7)));
+			}
+			
+			//calcula diferenca dos dias
+			if(tipoIntervalo == "mes" && diferencaMes <= 12 && diferencaMes > 0) {
+				return true;
+			} else if (diferencaMes < 0 || diferencaMes > 1) {
+				imprimeErro();
+				return false;
+			} else if(diferencaMes == 0){
+				diferencaDia = parseInt(fim.substring(8,10)) - parseInt(inicio.substring(8,10));
+			} else { //diferencaMes == 1
+				if(parseInt(inicio.substring(8,10)) - parseInt(fim.substring(8,10)) < 0) { //Se ultrapassou o dia no mes seguinte 
+					imprimeErro();
+					return false;
+				} else { 
+					switch(inicio.substring(5,7)) { //switch no mes inicial
+						case "01":
+						case "03":
+						case "05":
+						case "07":
+						case "08":
+						case "10":
+						case "12":
+							diferencaDia = parseInt(fim.substring(8,10)) + (31 - parseInt(inicio.substring(8,10)));
+							break;
+						case "02":
+							diferencaDia = parseInt(fim.substring(8,10)) + (28 - parseInt(inicio.substring(8,10)));
+							break;
+						case "04":
+						case "06":
+						case "09":
+						case "11":					
+							diferencaDia = parseInt(fim.substring(8,10)) + (30 - parseInt(inicio.substring(8,10)));
+							break;
+					}
+				}
+			}
+			
+			//calcula diferenca das horas
+			if(tipoIntervalo == "dia") {
+				if (diferencaDia > 0) { //A verifiÃ§Ã£o se ultrapassa o mesmo dia no mÃªs seguinte jÃ¡ foi realizada
+					return true;
+				}
+				else {
+					imprimeErro();
+					return false;
+				}
+			} else if (diferencaDia < 0 || diferencaDia > 1) {
+				imprimeErro();
+				return false;
+			} else if(diferencaDia == 0){
+				diferencaHora = parseInt(fim.substring(11,13)) - parseInt(inicio.substring(11,13));
+			} else { //diferencaDia == 1
+				diferencaHora = parseInt(fim.substring(11,13)) + (24 - parseInt(inicio.substring(11,13)));				
+			}
+			
+			//calcula diferenca das minutos
+			if(tipoIntervalo == "hora") {
+				if (diferencaHora > 0 && diferencaHora <= 24) {
+					return true;
+				}
+				else {
+					imprimeErro();
+					return false;
+				}				
+			} else if (diferencaHora < 0 || diferencaHora > 1) {
+				imprimeErro();
+				return false;
+			} else if(diferencaHora == 0){
+				diferencaMinuto = parseInt(fim.substring(14,16)) - parseInt(inicio.substring(14,16));
+			} else { //diferencaHora == 1
+				diferencaMinuto = parseInt(fim.substring(14,16))  + (60 - parseInt(inicio.substring(14,16)));				
+			}
+			
+			if(tipoIntervalo == "minuto"){
+				if (diferencaMinuto > 0 && diferencaMinuto <= 60) {
+					return true;
+				}
+				else {
+					imprimeErro();
+					return false;
+				}
+			}
+			
+			console.log("Erro desconhecido ao calcular a diferenÃ§a de datas");
+			return false;
+		
+		}
+		
+		String.prototype.replaceAt=function(index, character) {
+		    return this.substr(0, index) + character + this.substr(index+character.length);
+		}
+		
+		function atualizaFormatoDataHoraInput(formato){
+			var dtInicial = $("#input_datetime_inicial").val();
+			var dtFinal = $("#input_datetime_final").val();
+			switch (formato) {				
+				case "mes":
+					dtInicial = (dtInicial.length == 0 ? "" : dtInicial.replaceAt(8,"0"));
+					dtInicial = (dtInicial.length == 0 ? "" : dtInicial.replaceAt(9,"1"));
+					dtFinal = (dtFinal.length == 0 ? "" : dtFinal.replaceAt(8,"0"));
+					dtFinal = (dtFinal.length == 0 ? "" : dtFinal.replaceAt(9,"1"));					
+				case "dia":
+					dtInicial = (dtInicial.length == 0 ? "" : dtInicial.replaceAt(11,"0"));
+					dtInicial = (dtInicial.length == 0 ? "" : dtInicial.replaceAt(12,"0"));
+					dtFinal = (dtFinal.length == 0 ? "" : dtFinal.replaceAt(11,"0"));
+					dtFinal = (dtFinal.length == 0 ? "" : dtFinal.replaceAt(12,"0"));					
+				case "hora":
+					dtInicial = (dtInicial.length == 0 ? "" : dtInicial.replaceAt(14,"0"));
+					dtInicial = (dtInicial.length == 0 ? "" : dtInicial.replaceAt(15,"0"));
+					dtFinal = (dtFinal.length == 0 ? "" : dtFinal.replaceAt(14,"0"));
+					dtFinal = (dtFinal.length == 0 ? "" : dtFinal.replaceAt(15,"0"));
+					break;
+				default:
+					console.log("Erro: formato " + formato + " nÃ£o Ã© vÃ¡lido para atualizaÃ§Ã£o do input de data/hora");
+					alert("Erro: verifique o log do console");
+					break;
+			}
+			$("#input_datetime_inicial").val(dtInicial);
+			$("#input_datetime_final").val(dtFinal);
+			
+		}
+		
+		function atualiza_datetimepickers(){
+			var dtFinal = $("#input_datetime_final");
+			var dtInicial = $("#input_datetime_inicial");
+			
+			dtInicial.datepicker("destroy");
+			dtFinal.datepicker("destroy");
+			var formato_datetime;
+			switch ($("#interval").val()) {
+				case "ano":
+					formato_datetime = {
+						timeFormat : "HH:mm:00",
+						dateFormat : "yy-mm-dd"
+					};
+					break;
+				case "hora":
+					formato_datetime = {
+						timeFormat : "HH:00:00",
+						dateFormat : "yy-mm-dd"
+					};
+					atualizaFormatoDataHoraInput("hora");
+					break;
+				case "dia":
+					formato_datetime = {
+						timeFormat : "00:00:00",
+						dateFormat : "yy-mm-dd",
+					};
+					atualizaFormatoDataHoraInput("dia");
+					break;
+				case "mes":
+					formato_datetime = {
+						timeFormat : "00:00:00",
+						dateFormat : "yy-mm-01",
+						changeMonth : true,
+						changeYear : true,
+						showButtonPanel : true
+						/*onChangeMonthYear: function(dateText, inst) {
+							debugger;
+							$(this).datetimepicker('setDate', new Date(
+													inst.selectedYear,
+													inst.selectedMonth,
+													1)
+							);							
+						}*/ //TODO: Algum evento estÃ¡ chamando essa funÃ§Ã£o logo depois dela ser usada corretamente e definindo um valor padrÃ£o.
+					};
+					atualizaFormatoDataHoraInput("mes");
+					break;
+				default:
+					alert("Erro com o calendÃ¡rio");
+					break; 
+			} 
+			formato_datetime['maxDate'] = 0;
+						
+			dtFinal.datetimepicker(formato_datetime);			
+			dtInicial.datetimepicker(formato_datetime);
+		}
+		
+				
+		function atualiza_menu() {
+			var value = this.value;
+			var text = $("#report_type option:selected").text();
+			var refential_td = $("#table_menu tr:first td:first");
+
+			remove_noncommom_options();
+			add_message_type_option(
+					$("#table_menu tr:first td:first"), value);
+			switch (value) {
+			case "grupo":
+				add_group_option(2);
+				break;
+			case "resumo":
+			case "top":
+			case "prioridade":
+				add_group_option(1);
+				break;
+			case "resumoAssinantes":
+				break;
+			default:
+				alert("Tipo de grÃ¡fico " + text
+						+ " nÃ£o Ã© reconhecido.");
+				console.log("Tipo de grÃ¡fico escolhido no menu nÃ£o Ã© valido. Valor: "
+								+ value
+								+ "; texto: "
+								+ text
+								+ ".");
+				break;
+			}
+		}
+		
+		function libera_geracao_grafico(){
+			$("#btn_generate_graph").removeAttr('disabled');
+			$("#btn_generate_graph").attr('class', 'botao-livre');
+		}
+		
+		function nomeMes(mes){
+			switch(mes){
+				case "1":
+				case 1:
+				case "01":
+					return "janeiro";
+				case "2":
+				case 2:
+				case "02":
+					return "fevereiro";
+				case "3":
+				case 3:
+				case "03":
+					return "março";
+				case "4":
+				case 4:
+				case "04":
+					return "abril";
+				case "5":
+				case 5:
+				case "05":
+					return "maio";
+				case "6":
+				case 6:
+				case "06":
+					return "junho";
+				case "7":
+				case 7:
+				case "07":
+					return "julho";
+				case "8":
+				case 8:
+				case "08":
+					return "agosto";
+				case "9":
+				case 9:
+				case "09":
+					return "setembro";
+				case "10":	
+				case 10:
+					return "outubro";
+				case "11":
+				case 11:
+					return "novembro";
+				case "12":	
+				case 12:
+					return "dezembro";
+				default:
+					console.log("mes invalido");
+					return "mes invalido";
+			}
+		}
+		
+		function nomeGrafico(tipoIntervalo, dataInicial, dataFinal) {
+			var nomeTipo, nomeDataInicio, nomeDataFim, nomeDataComplemento;
+			
+			switch(tipoIntervalo){
+				case "dia":
+					nomeDataInicio = dataInicial.substring(8, 10);
+					nomeDataFinal = nomeMes(dataFinal.substring(8, 10));
+					if(dataInicial.substring(5, 7) == dataFinal.substring(5, 7)) { //MÃªs Ã© igual (logo ano tbm)
+						nomeDataComplemento = " de " + nomeMes(dataFinal.substring(5, 7)) + " de " + dataFinal.substring(0, 4);		
+					} else {
+						nomeDataInicio += " de " + nomeMes(dataInicial.substring(5, 7));
+						nomeDataFinal += " de " + nomeMes(dataFinal.substring(5, 7));
+						if(dataInicial.substring(0, 4) == dataFinal.substring(0, 4)) { //Ano Ã© igual
+							nomeDataComplemento += " de " + dataFinal.substring(0, 4);		
+						} else {
+							nomeDataInicio += " de " + dataInicial.substring(0, 4);
+							nomeDataFinal += " de " + dataFinal.substring(0, 4);
+							nomeDataComplemento = "";
+						}
+					}
+					break;
+				case "mes":
+					nomeDataInicio = nomeMes(dataInicial.substring(5, 7));
+					nomeDataFinal = nomeMes(dataFinal.substring(5, 7));
+					if(dataInicial.substring(0, 4) == dataFinal.substring(0, 4)) { //Ano Ã© igual
+						nomeDataComplemento = " de " + dataFinal.substring(0, 4);		
+					} else {
+						nomeDataInicio += " de " + dataInicial.substring(0, 4);
+						nomeDataFinal += " de " + dataFinal.substring(0, 4);
+						nomeDataComplemento = "";
+					}
+					break;
+				case "hora":
+					break;
+				case "ano":
+					break;
+				
+			}
+			
+		/* 	minute = this.logTime.substring(14, 16);
+		case "hora":
+			hour = this.logTime.substring(11, 13);
+		case "dia":
+			day = this.logTime.substring(8, 10);
+		case "mes":
+			year = parseInt(this.logTime.substring(0, 4),10) - 1900;
+			month = parseInt(this.logTime.substring(5, 7),10) -1; */
+			
+			return "GrÃ¡fico " + nomeTipo + "<br>Intervalo de " + nomeDataInicio + " atÃ© " + nomeDataFim + nomeDataComplemento;	
+		}		
+		
+		$("#report_type").change(atualiza_menu);		
+		$("#interval").change(atualiza_datetimepickers);
+		
+				
+		$("#report_type").change();
+		$("#interval").change();
+		
+		//$("#input_datetime_inicial").change(libera_geracao_grafico); //???
+		libera_geracao_grafico();
+		
+		
+		//$("#input_datetime_final")
+
+		// Garante a autenticaÃ§Ã£o pelo mÃ©todo post
+		/*
+		 * $.ajaxSetup({ headers: { 'X-CSRF-TOKEN':
+		 * $('meta[name="_csrf"]').attr('content') } });
+		 */
+
+		function generate_graph(params) {
+			$("#loading").removeAttr("hidden");
+			$("#btn_generate_graph").attr('disabled', '');
+			$("#btn_generate_graph").attr('class', 'botao-travado');
+
+			var complete_data = new Object();
+
+			switch (params.report_type) {
+				case "top":
+					complete_data.quantidade = params.quantidade_top;
+				case "resumo":
+					complete_data.fenomeno = params.fenomeno;
+					complete_data.tempoInicial = params.datetime_inicial;
+					complete_data.tempoFinal = params.datetime_final;
+					complete_data.unidadeTempo = params.interval;
+					complete_data.tipoMsg = params.message_type;
+				case "resumoAssinantes":
+				case "grupo":
+				case "prioridade":
+					complete_data.listaAssinantes = params.group;
+					complete_data.tempoInicial = params.datetime_inicial;
+					complete_data.tempoFinal = params.datetime_final;
+					complete_data.unidadeTempo = params.interval;
+					complete_data.tipoMsg = params.message_type;
+					break;
+				default:
+					break;
+			}			
+			
+			$.ajax({
+			    type: "POST",
+			    url: params.report_type,
+			    data: JSON.stringify(complete_data),
+			    contentType: "application/json; charset=utf-8",
+			    dataType: "json",
+			    success: function(data){
+			    	serieData[0] = data;
+					createChart(data, complete_data);
+			        console.log(data);
+			        $("#loading").attr('hidden', '');
+					$("#btn_generate_graph").removeAttr('disabled');
+			   },
+			    error: function(err) {
+			        console.log(err);
+			    }
+			});
+		}
+
+		 
+		 
+		 
+		 
+		 
+		/* FunÃ§oes/aÃ§oes do grafico/flot */
+
+		var ticks = [];
+		var rawData = [];
+		var dataSet = [];
+		var options;
+		var previousPoint = null, previousLabel = null;
+
+		/*  $("<div id='tooltip'></div>").css({
+			position : "absolute",
+			display : "none",
+			border : "1px solid #fdd",
+			padding : "2px",
+			"background-color" : "#fee",
+			opacity : 0.80
+		}).appendTo("body");  */
+
+		
+		function cria_tooltip(objeto, tipo) {
+			objeto.bind("plothover",
+					function(event, pos, item) {
+						if (item) {
+							if ((previousLabel != item.series.label)
+									|| (previousPoint != item.dataIndex)) {
+								previousPoint = item.dataIndex;
+								previousLabel = item.series.label;
+								$("#tooltip").remove();								
+								var valor;
+								switch(tipo) {
+									case "barra":
+ 										valor = item.datapoint[0];
+										break;
+									case "linha":
+										valor = item.datapoint[1];
+										break;
+									default:
+										return; //NÃ£o hÃ¡ legenda
+										break;
+								}
+
+								var color = item.series.color;
+								showTooltip(
+										item.pageX,
+										item.pageY,
+										color,
+										//item.series.label
+										valor + " mensagens");												
+							}
+						} else {
+							$("#tooltip").remove();
+							previousPoint = null;
+						}
+					});
+		};
+		
+		
+		function showTooltip(x, y, color, contents) {
+			$('<div id="tooltip">' + contents + '</div>')
+					.css(
+							{
+								position : 'absolute',
+								display : 'none',
+								top : y - 10,
+								left : x + 10,
+								border : '2px solid ' + color,
+								padding : '3px',
+								'font-size' : '9px',
+								'border-radius' : '5px',
+								'background-color' : '#fff',
+								'font-family' : 'Verdana, Arial, Helvetica, Tahoma, sans-serif',
+								opacity : 0.9
+							}).appendTo("body").fadeIn(200);
+		}
+
+		function set_graph_top(graph_data) {
+			dataSet = [ {
+				label : "Mensagens por Assinante",
+				data : rawData,
+				color : "#5E5E5E"
+			} ];
+
+			var i = graph_data.length;
+			ticks = [];
+			$.each(graph_data, function() {
+				i--;
+				var ua_name;
+				if (this.assinante.indexOf("=") >= 0){
+					ua_name = this.assinante.split('=')[1].split("/")[0].split(",")[0];
+				} else {
+					ua_name = this.assinante;
+				}
+				ticks[i] = [ i, ua_name ];
+				rawData.push([ this.total, i ]);
+
+			});
+
+			options = {
+				series : {
+					bars : {
+						show : true,
+						color : "#FF0000"
+					},
+					valueLabels:
+	                {
+		                show: true,
+		                horizAlign: 'insideMax',		              
+		                decimals: 0,
+		                fontcolor: 'white',		               
+	                }
+				},
+				bars : {
+					align : "center",
+					barWidth : 0.5,
+					horizontal : true,
+					fillColor : {
+						colors : [ {
+							opacity : 0.5
+						}, {
+							opacity : 1
+						} ]
+					},
+					lineWidth : 1,					
+					color : "#FF0000"
+				},				              
+				xaxis : {
+					axisLabel : "Quantidade de mensagens no perÃ­odo",
+					axisLabelUseCanvas : true,
+					axisLabelPadding : 10,
+					color : "black",
+					tickColor : "#5E5E5E"// ,
+
+				},
+				yaxis : {
+					axisLabel : "Assinante",
+					axisLabelUseCanvas : true,
+					tickColor : "#5E5E5E",
+					ticks : ticks,
+					color : "black"
+				},
+				legend : {
+					container: $("#flot-legenda"),
+					noColumns : 0,
+					labelBoxBorderColor : "#858585",
+					position : "ne"
+				},
+				grid : {
+					hoverable : true,
+					// backgroundColor: { colors: ["#171717", "#4F4F4F"] },
+					borderWidth : 2
+				}
+			};
+		}
+
+		function set_graph_resumo(graph_data, interval) {
+
+			var max, min, max_grid, min_grid;
+			var datetime, year, month, day, hour, minute, timeformat_string;
+			var unidade_tempo;
+			$.each(graph_data, function() {				
+				switch (interval) { //Converte os valores de acordo com o padrÃ£o :S
+					case "ano":
+						minute = this.logTime.substring(14, 16);
+					case "hora":
+						hour = this.logTime.substring(11, 13);
+					case "dia":
+						day = this.logTime.substring(8, 10);
+					case "mes":
+						year = parseInt(this.logTime.substring(0, 4),10) - 1900;
+						month = parseInt(this.logTime.substring(5, 7),10) -1;
+						break;	
+				}
+				
+				switch (interval) {
+				case "mes":
+					datetime = Date.UTC(year, month);
+					ticksize_string = "month";
+					unidade_tempo = "meses";
+					break;
+				case "dia":
+					datetime = Date.UTC(year, month, day);
+					ticksize_string = "day";
+					unidade_tempo = "dias";
+					break;
+				case "hora":
+					datetime = Date.UTC(year, month, day, hour);
+					ticksize_string = "hour";
+					unidade_tempo = "horas";
+					break;
+				case "ano":
+					datetime = Date.UTC(year, month, day, hour, minute);
+					ticksize_string = "ano";
+					unidade_tempo = "anos";
+					break;
+				}
+				/* if (rawData.length == 0){
+					datahora_seguinte = datetime;
+				}
+				while (datahora_seguinte != datetime) {
+					rawData.push([datahora_seguinte, 0]);
+					datahora_seguinte += intervalo;			
+				} */
+				rawData.push([ datetime, this.total ]);
+			});
+
+			// Verifica e define maximo e minimo			
+			max = 0;
+			min = Number.POSITIVE_INFINITY;			
+			for (var i = 0; i < graph_data.length; i++) {				
+				if (parseInt(rawData[i][1],10) > parseInt(max,10) ) {
+					max = rawData[i][1];					
+				}
+				if (parseInt(rawData[i][1],10) < min) {
+					min = rawData[i][1];
+				}
+			}
+			
+			// Verifica e define o valor mÃ­nimo e mÃ¡ximo para o grid baseado na sua
+			// amplitude
+			var grid_amp = max - min;
+			max_grid = max + 0, 1 * grid_amp;
+			min_grid = min - 0, 1 * grid_amp;
+			if (parseInt(min_grid,10) < 0) {
+				min_grid = 0;
+			}
+
+			// Esvazia e define os novos picos
+			var picos = [];
+			for (var i = 1; i <= rawData.length; i += 1) {
+				if (rawData[i - 1][1] == max) { // O Ã­ndice do array comeÃ§a em zero,
+					var primeiro_valorX = rawData[0][0];
+					var ultimo_valorX = rawData[rawData.length -1][0];
+					var data_picoX = rawData[i-1][0];
+					
+					picos.push([primeiro_valorX,max]);
+					picos.push([data_picoX,max]);
+					picos.push([ultimo_valorX,max]);				
+				}
+			}
+			dataSet = [ {				 
+				label : "Limite Pico (" + max + ")",
+				 data: picos,
+				 color: "#6DC0D1"				
+			}  , {
+				label : "Quantidade",
+				color : "#FF8848",
+				data : rawData
+			}
+			];
+
+			options = {
+				grid : {
+					hoverable : true,
+					clickable : true
+				},
+				series: {
+	                   lines: { show: true },
+	                   points: { show: true }
+	            },
+				legend: {
+					container: $("#flot-legenda")
+				},
+				xaxis : {
+					axisLabel: 'tempo em ' + unidade_tempo,
+					mode : "time",
+					axisLabelPadding : 5,
+					ticksize : [ 1, ticksize_string ]
+				},
+				yaxis : {
+					axisLabel: 'Quantidade de mensagens',
+					position: 'left',
+					axisLabelPadding : 5,
+					tickDecimals : 0
+				}
+			};
+
+		}
+
+		function set_graph_grupo(graph_data) {
+			dataSet = [ {
+				label : "Mensagens por grupo",
+				data : rawData,
+				color : "#5E5E5E"
+			} ];
+
+			var i = 1;
+			var grupo = [];
+			$.each(graph_data, function() {
+				grupo.push(["Grupo " + i, this.total]);				
+				i++;
+			});			
+			grupo.sort(function(x,y) {				
+				return x[1] - y[1];
+			});
+			
+			i = 0;
+			$.each(grupo, function() {
+				ticks[i] = [i, this[0]];
+				rawData.push([ this[1], i ]);
+				i++;
+			});
+			
+			options = {
+				series : {
+					bars : {
+						show : true
+					},
+					valueLabels:
+	                {
+		                show: true,
+		                horizAlign: 'insideMax',
+		                decimals: 0,		                	                
+		                fontcolor: 'white',		                
+	                }
+				},
+				bars : {
+					align : "center",
+					barWidth : 0.5,
+					horizontal : true,
+					lineWidth : "#A8A8A8"
+				},
+				xaxis : {
+					axisLabel : "Quantidade de mensagens no perÃ­odo",
+					axisLabelUseCanvas : true,
+					axisLabelPadding : 10,
+					tickColor : "#5E5E5E"// ,
+				},
+				yaxis : {
+					axisLabel : "Assinante",
+					axisLabelUseCanvas : true,
+					axisLabelPadding : 5,
+					tickColor : "#5E5E5E",
+					ticks : ticks,
+					color : "black"
+				},
+				legend : {
+					container: $("#flot-legenda"),
+					noColumns : 0,
+					labelBoxBorderColor : "#858585",
+					position : "ne"
+				}
+			};
+		}
+
+		function set_graph_prioridade(graph_data) {
+			dataSet.length = 0; //
+			var i = 0;			
+						
+			$.each(graph_data, function() {
+				dataSet.push({					
+					label : "Prioridade " + this.prioridade,
+					data : parseInt(this.total)
+				});
+				i++;
+			});
+			options = {
+				series: {
+			        pie: {
+			            show: true,
+			            radius: 3/4,			            
+			            label: {
+			                show: true,
+			                radius: 3/4,
+			                formatter: function(label,point){
+			                    return label+"<br>"+point.percent.toFixed(2)+"% ("+point.data[0][1]+" mensagens"+")";
+			                }			                
+			            }
+			        }
+			    },
+			    legend: {
+			        show: false
+			    }
+			};
+		}
+
+		function draw_graph(graph_data, report_type, interval) {
+			limpa_flot();			
+			if (graph_data.length == 0) {
+				$("#flot-placeholder").append(
+						"<p>NÃ£o hÃ¡ dados no perÃ­odo selecionado</p>");
+				return 0;
+			}
+			ticks.length = rawData.length = dataSet.legth = 0;
+			var tipoGrafico = "";
+			switch (report_type) {
+				case "top":
+					set_graph_top(graph_data);
+					tipoGrafico = "barra";
+					break;
+				case "grupo":
+					set_graph_grupo(graph_data);
+					tipoGrafico = "barra";
+					break;
+				case "resumo":
+					set_graph_resumo(graph_data, interval);
+					tipoGrafico = "linha";
+					break;
+				case "prioridade":
+					set_graph_prioridade(graph_data);
+					break;
+				case "resumoAssinantes":
+					limpa_flot();
+					$("#flot-placeholder")
+							.append(
+									"<p>Este relatÃ³rio estÃ¡ disponÃ­vel apenas no formato .csv</p>");
+					return;
+				default:
+					$("#flot-placeholder").append(
+							"<p>Tipo de relatÃ³rio invÃ¡lido</p>");
+					console.log("Tipo de relatÃ³rio " + data_type + " nÃ£o existe");
+					break;
+			}
+			$("#flot-placeholder").unbind();
+			$.plot($("#flot-placeholder"), dataSet, options);
+			cria_tooltip($("#flot-placeholder"), tipoGrafico);			
+		}
+		
+		function limpa_flot(){
+			$("#flot-legenda").empty();
+			$("#flot-placeholder").empty();
+		}
+		
+	 	
+		function createChart(newSeries, complete_data) {
+			
+			var dynSerie = {
+				data: []
+			};
+			
+
+			var drillSerie = {
+				data: []
+			};
+			
+			$.each(newSeries, function(i, item) {
+				dynSerie.data.push({
+					name: nomeMes(new Date(item[0]).getMonth() + 1) + '-' + new Date(item[0]).getFullYear(),
+					//name: 'T' + i,
+					y : item[1],
+					x : item[0],
+					drilldown : true																
+				});
+			});
+							
+			Highcharts
+					.chart(
+							'container',
+							{
+								chart : {
+									type : 'column',
+									events : {
+										drilldown : function(e) {
+											if (!e.seriesOptions) {
+												var chart = this;
+												
+												/*
+												var chart = this, drilldowns = {
+														'T1' : {
+														name : e.point.name,
+														data : serieData[1]
+													}
+												}  */
+												
+												//series = []; //drilldowns[e.point.name];
+												
+												
+																							
+												// Show the loading label
+												chart.showLoading('Simulating Ajax ...' + e.point.name);
+												$.get("http://localhost:8080/fenomenaByMonthBR?ini=201701&end=201803&fenomeno=CB&drilldown=" + e.point.name, function(data) {
+						                                chart.hideLoading();
+						                                serieData[1] = data;
+						                                
+						                               // drillSerie.push(e.point.name);
+						                               drillSerie.name = e.point.name;
+						                        		$.each(data, function(i, item) {
+						                        			drillSerie.data.push(
+						                        				item																
+						                        			);
+						                        		});
+						                        		
+						                        		//drillSerie.name = e.point.name;
+						                        		
+														var drilldowns = {
+																'T1'  : {
+																name : e.point.name,
+																data : serieData[1]
+															}
+														}  
+														
+														series = drilldowns[e.point.name];
+																			                        		
+						                                chart.addSeriesAsDrilldown(e.point, drillSerie);
+						                               // chart.addSeriesAsDrilldown(e.point, series); // funcionou
+						                               // chart.addSeriesAsDrilldown(e.point, drillSerie.data[e.point.name]);
+						                                // chart.addSingleSeriesAsDrilldown(e.point, data);
+						                        });
+											}
+										}
+									}
+								},
+								title : {
+									text : 'Mensagens do Brasil com fenômeno ' + complete_data.fenomeno 
+								},							
+								xAxis : {
+									type : 'datetime'
+								},
+								yAxis : {
+									title : {
+										text : 'Qtd Msg com fenômeno'
+									}
+								},
+								legend : {
+									enabled : true
+								},
+								plotOptions : {
+									area : {
+										fillColor : {
+											linearGradient : {
+												x1 : 0,
+												y1 : 0,
+												x2 : 0,
+												y2 : 1
+											},
+											stops : [
+													[
+															0,
+															Highcharts
+																	.getOptions().colors[0] ],
+													[
+															1,
+															Highcharts
+																	.Color(
+																			Highcharts
+																					.getOptions().colors[0])
+																	.setOpacity(
+																			0)
+																	.get('rgba') ] ]
+										},
+										marker : {
+											radius : 2
+										},
+										lineWidth : 1,
+										states : {
+											hover : {
+												lineWidth : 1
+											}
+										},
+										threshold : null
+									}
+								},
+								 series: [{
+						                type: 'column',
+						                name: 'qtd msg do Brasil com fenômeno ' + complete_data.fenomeno ,
+						                allowPointSelect: true,
+						                data: dynSerie.data
+						            }]
+							});
+
+		}
+		
+		var options = {
+				chart : {
+					renderTo : 'high',
+					type : 'column',
+					events : {
+						drilldown : function(e) {
+							if (!e.seriesOptions) {
+								data = getData(e.point.name).series[0];
+								var chart = this;
+								chart.addSeriesAsDrilldown(e.point, data);
+								console.log(data);
+								//  console.log(chart);
+							}
+						}
+					}
+				},
+
+				plotOptions : {
+					series : {
+						borderWidth : 0,
+						dataLabels : {
+							enabled : true
+						}
+					}
+				},
+
+				legend : {
+					enabled : true
+				},
+
+				xAxis : {
+					categories : []
+				},
+
+				series : [ {} ],
+				drilldown : {}
+			};
+		
+		function getData(complete_data) {
+			var result = null;
+
+			$.ajax({
+			    type: "POST",
+			    url: complete_data.report_type,
+			    data: JSON.stringify(complete_data),
+			    contentType: "application/json; charset=utf-8",
+			    dataType: "json",
+			    success: function(data){
+			    	result = data;
+			   },
+			    error: function(err) {
+			        console.log(err);
+			    }
+			});
+			return result;
+		}
+		
+		/*
+		$.getJSON('http://localhost:8080/fenomenaByMonthBR?ini=201701&end=201803&fenomeno=CB&drilldown=T2',
+				function(data) {
+					options.series = data.series;
+					//options.drilldown = data.drilldown;
+					console.log(data.drilldown);
+					var chart = new Highcharts.Chart(options);
+		});
+		*/
+		
+	});
+	
+
+</script>
